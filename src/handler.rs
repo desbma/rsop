@@ -251,7 +251,9 @@ impl HandlerMapping {
         copy(&mut stdin_locked, &mut child_stdin)?;
         log::trace!("Pipe exhausted");
         drop(child_stdin);
-        child.wait()?;
+        if let RunMode::ForkWait = handler.mode {
+            child.wait()?;
+        }
 
         Ok(())
     }
