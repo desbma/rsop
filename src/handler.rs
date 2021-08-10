@@ -256,7 +256,7 @@ impl HandlerMapping {
 
     fn build_cmd(cmd: &str, shell: bool) -> anyhow::Result<Vec<String>> {
         let cmd = if !shell {
-            shlex::split(&cmd).ok_or_else(|| anyhow::anyhow!("Invalid command {:?}", cmd))?
+            shlex::split(cmd).ok_or_else(|| anyhow::anyhow!("Invalid command {:?}", cmd))?
         } else {
             vec!["sh".to_string(), "-c".to_string(), cmd.to_string()]
         };
