@@ -14,17 +14,17 @@ If you spend most time in a terminal, and are unsatisfied by current solutions t
 ## Features
 
 - Start program to view/edit file according to extension or MIME type
-- provides two tools (in a single binary):
+- Provides two tools (in a single binary):
   - `rso`: open file (`xdg-open` replacement)
   - `rsp`: preview files in terminal, to be used for example in terminal file managers or [`fzf`](https://github.com/junegunn/fzf) preview panel
+- Supports opening and previewing from data piped on stdin (very handy for advanced shell scripting, see [below](#show-me-some-cool-stuff-rsop-can-do))
 - Simple config file (no regex or funky conditionals) to describe file formats, handlers, and associate both
 
 Compared to other `xdg-open` alternatives:
 
 - `rsop` is consistent and accurate, unlike say [ranger](https://github.com/ranger/ranger/issues/1804)
-- `rsop` does not rely on `.desktop` files (see section [Why no .desktop support](#Why no .desktop support))
+- `rsop` does not rely on `.desktop` files (see section [Why no .desktop support](#why-no-desktop-support))
 - `rsop` does opening and previewing with a single self contained tool and config file
-- `rsop` supports opening and previewing from data piped on stdin
 - `rsop` is not tied to a file manager or a runtime environment, you only need the `rsop` binary and your config file and can use it in interactive terminal sessions, file managers, `fzf` invocations...
 - `rsop` is very fast (not that it matters in practice, but it's good to know)
 
@@ -69,7 +69,7 @@ _TODO image_
 ## Why no `.desktop` support?
 
 - Supporting them means the program author that ships a `.desktop` file decides which MIME types to support, and which arguments to pass to the program. This is a wrong paradidm, as this is fundamentally a user's decision.
-- Many programs do not ship one, so this would not be enough anyway.
+- Many programs do not ship one, especially command line tools, so this would not be enough anyway.
 
 ## What does `rstop` stands for?
 
