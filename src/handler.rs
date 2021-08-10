@@ -211,15 +211,18 @@ impl HandlerMapping {
         let cmd = Self::substitute(&handler.command, path, &term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
+        let mut command = Command::new(&cmd_args[0]);
+        command.args(&cmd_args[1..]).stdin(Stdio::null());
         match handler.mode {
-            RunMode::ForkWait => Command::new(&cmd_args[0])
-                .args(&cmd_args[1..])
-                .stdin(Stdio::null())
-                .status()
-                .map(|_s| ())
-                .map_err(anyhow::Error::new),
+            RunMode::ForkWait => {
+                command.status()?;
+            }
+            RunMode::Fork => {
+                command.spawn()?;
+            }
             _ => unimplemented!(),
         }
+        Ok(())
     }
 
     fn run_pipe(handler: &Handler, header: &[u8], stdin: &Stdin) -> anyhow::Result<()> {
@@ -235,22 +238,20 @@ impl HandlerMapping {
 
         let mut stdin_locked = stdin.lock();
 
-        match handler.mode {
-            RunMode::ForkWait => {
-                let mut child = Command::new(&cmd_args[0])
-                    .args(&cmd_args[1..])
-                    .stdin(Stdio::piped())
-                    .spawn()?;
-                let mut child_stdin = child.stdin.take().unwrap();
-                child_stdin.write_all(header)?;
-                log::trace!("Header written ({} bytes)", header.len());
-                copy(&mut stdin_locked, &mut child_stdin)?;
-                log::trace!("Pipe exhausted");
-                drop(child_stdin);
-                child.wait()?;
-            }
-            _ => unimplemented!(),
-        }
+        let mut child = Command::new(&cmd_args[0])
+            .args(&cmd_args[1..])
+            .stdin(Stdio::piped())
+            .spawn()?;
+
+        let mut child_stdin = child.stdin.take().unwrap();
+        child_stdin.write_all(header)?;
+        log::trace!("Header written ({} bytes)", header.len());
+
+        // TODO use splice if we can
+        copy(&mut stdin_locked, &mut child_stdin)?;
+        log::trace!("Pipe exhausted");
+        drop(child_stdin);
+        child.wait()?;
 
         Ok(())
     }
