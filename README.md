@@ -66,12 +66,14 @@ pa() {
 
 _TODO image_
 
-## Why no `.desktop` support?
+## FAQ
+
+### Why no `.desktop` support?
 
 - Supporting them means the program author that ships a `.desktop` file decides which MIME types to support, and which arguments to pass to the program. This is a wrong paradidm, as this is fundamentally a user's decision.
 - Many programs do not ship one, especially command line tools, so this would not be enough anyway.
 
-## What does `rstop` stands for?
+### What does `rsop` stands for?
 
 "**R**eally **S**imple **O**pener/**P**reviewer" or "**R**eliable **S**imple **O**pener/**P**reviewer" or "**R**u**S**t **O**pener/**P**reviewer"
 
