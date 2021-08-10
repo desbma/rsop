@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use crate::config;
 use crate::config::{Handler, RunMode};
+use crate::RsopMode;
 
 #[derive(Debug)]
 struct Handlers {
@@ -68,20 +69,20 @@ impl HandlerMapping {
         })
     }
 
-    pub fn preview_path(&self, path: &Path) -> anyhow::Result<()> {
-        Self::dispatch_path(path, &self.handlers_preview, &self.default_handler_preview)
+    pub fn handle_path(&self, mode: RsopMode, path: &Path) -> anyhow::Result<()> {
+        let (handlers, default_handler) = match mode {
+            RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
+            RsopMode::Open => (&self.handlers_open, &self.default_handler_open),
+        };
+        Self::dispatch_path(path, handlers, default_handler)
     }
 
-    pub fn preview_pipe(&self, pipe: &Stdin) -> anyhow::Result<()> {
-        Self::dispatch_pipe(pipe, &self.handlers_preview, &self.default_handler_preview)
-    }
-
-    pub fn open_path(&self, path: &Path) -> anyhow::Result<()> {
-        Self::dispatch_path(path, &self.handlers_open, &self.default_handler_open)
-    }
-
-    pub fn open_pipe(&self, pipe: &Stdin) -> anyhow::Result<()> {
-        Self::dispatch_pipe(pipe, &self.handlers_open, &self.default_handler_open)
+    pub fn handle_pipe(&self, mode: RsopMode, pipe: &Stdin) -> anyhow::Result<()> {
+        let (handlers, default_handler) = match mode {
+            RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
+            RsopMode::Open => (&self.handlers_open, &self.default_handler_open),
+        };
+        Self::dispatch_pipe(pipe, handlers, default_handler)
     }
 
     fn dispatch_path(

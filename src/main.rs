@@ -10,7 +10,7 @@ mod handler;
 
 #[derive(Debug, strum_macros::EnumString)]
 #[strum(ascii_case_insensitive)]
-enum RsopMode {
+pub enum RsopMode {
     Preview,
     Open,
 }
@@ -62,15 +62,9 @@ fn main() {
 
     // Do the job
     if let Some(path) = cl_opts.path {
-        match mode {
-            RsopMode::Preview => handlers.preview_path(&path).unwrap(),
-            RsopMode::Open => handlers.open_path(&path).unwrap(),
-        }
+        handlers.handle_path(mode, &path).unwrap();
     } else {
         let stdin = io::stdin();
-        match mode {
-            RsopMode::Preview => handlers.preview_pipe(&stdin).unwrap(),
-            RsopMode::Open => handlers.open_pipe(&stdin).unwrap(),
-        }
+        handlers.handle_pipe(mode, &stdin).unwrap();
     }
 }
