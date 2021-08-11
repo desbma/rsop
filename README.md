@@ -1,6 +1,6 @@
 # rsop
 
-[![Build status](https://img.shields.io/travis/desbma/rsop/master.svg?style=flat)](https://travis-ci.org/desbma/rsop)
+[![Build status](https://github.com/desbma/rsop/actions/workflows/ci.yml/badge.svg)](https://github.com/desbma/rsop/actions)
 [![License](https://img.shields.io/github/license/desbma/rsop.svg?style=flat)](https://github.com/desbma/rsop/blob/master/LICENSE)
 
 Simple, fast & configurable tool to open and preview files.
