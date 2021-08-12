@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 use std::env;
-use std::io::{copy, Read, Stdin, Write};
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+use std::io::copy;
+use std::io::{Read, Stdin, Write};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::rc::Rc;
@@ -247,15 +251,52 @@ impl HandlerMapping {
         child_stdin.write_all(header)?;
         log::trace!("Header written ({} bytes)", header.len());
 
-        // TODO use splice if we can
-        copy(&mut stdin_locked, &mut child_stdin)?;
-        log::trace!("Pipe exhausted");
+        let copied = Self::pipe_copy(&mut stdin_locked, &mut child_stdin)?;
+        log::trace!("Pipe exhausted, copied {} bytes", copied);
         drop(child_stdin);
         if let RunMode::ForkWait = handler.mode {
             child.wait()?;
         }
 
         Ok(())
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    // Default chunk copy using stdlib's std::io::cpy when splice syscall is not available
+    fn pipe_copy<S, D>(src: &mut S, dst: &mut D) -> anyhow::Result<u64>
+    where
+        S: Read,
+        D: Write,
+    {
+        Ok(copy(src, dst)?)
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    // Efficient 0-copy implementation using splice
+    fn pipe_copy<S, D>(src: &mut S, dst: &mut D) -> anyhow::Result<usize>
+    where
+        S: AsRawFd,
+        D: AsRawFd,
+    {
+        let mut c = 0;
+        const SPLICE_LEN: usize = usize::MAX;
+        const SPLICE_FLAGS: nix::fcntl::SpliceFFlags =
+            nix::fcntl::SpliceFFlags::from_bits_truncate(0);
+        loop {
+            let moved = nix::fcntl::splice(
+                src.as_raw_fd(),
+                None,
+                dst.as_raw_fd(),
+                None,
+                SPLICE_LEN,
+                SPLICE_FLAGS,
+            )?;
+            if moved == 0 {
+                break;
+            }
+            c += moved;
+        }
+        Ok(c)
     }
 
     fn build_cmd(cmd: &str, shell: bool) -> anyhow::Result<Vec<String>> {
