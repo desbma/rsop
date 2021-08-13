@@ -45,7 +45,7 @@ ln -rsv /usr/local/bin/rs{op,o}
 - Simple file explorer, using [fd](https://github.com/sharkdp/fd) and [fzf](https://github.com/junegunn/fzf), using `rso` to preview files and `rsp` to open them:
 
 ```
-fd . | fzf --preview='rsp {}' | rso
+fd . | fzf --preview='rsp {}' | xargs rso
 ```
 
 _TODO image_
