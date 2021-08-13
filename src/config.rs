@@ -1,19 +1,5 @@
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RunMode {
-    Exec,
-    Fork,
-    ForkWait,
-}
-
-impl Default for RunMode {
-    fn default() -> Self {
-        RunMode::ForkWait
-    }
-}
-
 #[derive(Debug, serde::Deserialize)]
 pub struct Filetype {
     #[serde(default)]
@@ -26,11 +12,15 @@ pub struct Filetype {
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct Handler {
     pub command: String,
-    #[serde(default)]
-    pub mode: RunMode,
+    #[serde(default = "default_handler_wait")]
+    pub wait: bool,
     #[serde(default)]
     pub shell: bool,
     pub stdin_arg: Option<String>,
+}
+
+const fn default_handler_wait() -> bool {
+    true
 }
 
 #[derive(Debug, serde::Deserialize)]

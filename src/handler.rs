@@ -10,7 +10,7 @@ use std::process::{Command, Stdio};
 use std::rc::Rc;
 
 use crate::config;
-use crate::config::{Handler, RunMode};
+use crate::config::Handler;
 use crate::RsopMode;
 
 #[derive(Debug)]
@@ -217,14 +217,10 @@ impl HandlerMapping {
 
         let mut command = Command::new(&cmd_args[0]);
         command.args(&cmd_args[1..]).stdin(Stdio::null());
-        match handler.mode {
-            RunMode::ForkWait => {
-                command.status()?;
-            }
-            RunMode::Fork => {
-                command.spawn()?;
-            }
-            _ => unimplemented!(),
+        if handler.wait {
+            command.status()?;
+        } else {
+            command.spawn()?;
         }
         Ok(())
     }
@@ -254,7 +250,7 @@ impl HandlerMapping {
         let copied = Self::pipe_copy(&mut stdin_locked, &mut child_stdin)?;
         log::trace!("Pipe exhausted, copied {} bytes", copied);
         drop(child_stdin);
-        if let RunMode::ForkWait = handler.mode {
+        if handler.wait {
             child.wait()?;
         }
 
