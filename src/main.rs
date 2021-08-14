@@ -1,5 +1,4 @@
 use std::env;
-use std::io;
 use std::str::FromStr;
 
 use structopt::StructOpt;
@@ -64,7 +63,6 @@ fn main() {
     if let Some(path) = cl_opts.path {
         handlers.handle_path(mode, &path).unwrap();
     } else {
-        let stdin = io::stdin();
-        handlers.handle_pipe(mode, &stdin).unwrap();
+        handlers.handle_pipe(mode).unwrap();
     }
 }
