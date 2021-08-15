@@ -68,10 +68,12 @@ _TODO image_
 
 ## FAQ
 
-### Why no `.desktop` support?
+### Why no [`.desktop`](https://specifications.freedesktop.org/desktop-entry-spec/latest/) support?
 
-- Supporting them means the program author that ships a `.desktop` file decides which MIME types to support, and which arguments to pass to the program. This is a wrong paradidm, as this is fundamentally a user's decision.
-- Many programs do not ship one, especially command line tools, so this would not be enough anyway.
+- `.desktop` do not provide a _preview_ action separate from _open_.
+- One may need to pipe several programs to get to desired behavior, `.desktop` files does not help with this.
+- Many programs do not ship one, especially command line tools, so this would be incomplete anyway.
+- On a philosophical level, with `.desktop` files, the program's author (or packager) decides which MIME types to support, and which arguments to pass to the program. This is a wrong paradidm, as this is fundamentally a user's decision.
 
 ### What does `rsop` stands for?
 
