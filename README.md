@@ -26,6 +26,7 @@ Compared to other `xdg-open` alternatives:
 - `rsop` does not rely on `.desktop` files (see section [Why no .desktop support](#why-no-desktop-support))
 - `rsop` does opening and previewing with a single self contained tool and config file
 - `rsop` is not tied to a file manager or a runtime environment, you only need the `rsop` binary and your config file and can use it in interactive terminal sessions, file managers, `fzf` invocations...
+- `rsop` is taylored for terminal users (especially the preview feature)
 - `rsop` is very fast (not that it matters in practice, but it's good to know)
 
 ## Installation
@@ -39,6 +40,14 @@ install -Dm 755 -t /usr/local/bin target/release/rsop
 ln -rsv /usr/local/bin/rs{op,p}
 ln -rsv /usr/local/bin/rs{op,o}
 ```
+
+## Configuration
+
+When first started, `rsop` will create a minimal configuration file usually in `~/.config/rsop/config.toml`.
+
+See comments and example in that file to set up file types and handlers for your needs.
+
+A more advanced example configuration file is also available [here](./config/config.toml.example).
 
 ## Show me some cool stuff `rsop` can do
 

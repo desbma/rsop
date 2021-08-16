@@ -1,0 +1,51 @@
+#
+# This is a default minimal config file for rsop.
+# You most likely want to edit this file to fit your needs.
+#
+
+#
+# File types, identified by extension or MIME type
+#
+# - extensions
+# List of extensions, always checked before MIME type.
+#
+# - mimes
+# List of MIME types, the main type (part before the '/') can be used to match several subtypes.
+#
+
+[filetype.text]
+mimes = ["text"]
+
+
+#
+# Handlers
+#
+# - command
+# The command to run to open or preview file.
+# Substitution is done for the following expressions:
+#   %c: terminal column count
+#   %i: input path
+#   %l: terminal line count
+# Use '%%' if you need to pass a literal '%' char.
+#
+# - shell
+# If true, runs the command in a shell, use this if you use pipes. Defaults to false.
+#
+# - wait
+# If true, waits for the handler to exit. Defaults to true.
+#
+# - stdin_arg
+# When previewing or opening data from stdin, with what string to substitute '%i'. Defaults to "-", some programs require "".
+#
+
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat -A %i"
+
+[handler_preview.text]
+command = "head -n %l %i"
+
+[handler_open.text]
+command = "less %i"

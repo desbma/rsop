@@ -1,0 +1,214 @@
+#
+# This is an example of config file for rsop, showing advanced usage.
+# To use it you may need to install external programs invoked by handler commands like bat, chafa, hexyl, lsd, mdcat, odt2txt, pandoc, etc.
+# You most likely want to edit this file to fit your needs.
+#
+
+#
+# File types, identified by extension or MIME type
+#
+# - extensions
+# List of extensions, always checked before MIME type.
+#
+# - mimes
+# List of MIME types, the main type (part before the '/') can be used to match several subtypes.
+#
+
+[filetype.archive]
+extensions = ["a", "ace", "alz", "arc", "arj", "bz", "bz2", "cab", "cpio", "gz", "jar", "lha", "lz", "lzh", "lzma", "lzo", "rpm", "rz", "t7z", "tar", "tbz", "tbz2", "tgz", "tlz", "txz", "tZ", "tzo", "war", "xpi", "xz", "Z", "zip", "zst"]
+mimes = ["application/gzip", "application/zip"]
+
+[filetype.audio]
+mimes = ["audio"]
+
+[filetype.binary]
+mimes = ["application/octet-stream"]
+
+[filetype.deb]
+mimes = ["application/vnd.debian.binary-package"]
+
+[filetype.directory]
+mimes = ["inode/directory"]
+
+[filetype.html]
+extensions = ["htm", "html", "xhtml"]
+mimes = ["text/html"]
+
+[filetype.image]
+mimes = ["image"]
+
+[filetype.markdown]
+extensions = ["md"]
+
+[filetype.msdocument]
+extensions = ["doc", "docx", "rtf"]
+mimes = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/rtf"]
+
+[filetype.opendocument]
+extensions = ["odg", "odp", "ods", "odt"]
+mimes = ["application/vnd.oasis.opendocument.spreadsheet", "application/vnd.oasis.opendocument.text"]
+
+[filetype.pcap]
+mimes = ["application/vnd.tcpdump.pcap", "application/x-pcapng"]
+
+[filetype.pdf]
+mimes = ["application/pdf"]
+
+[filetype.scad]
+extensions = ["scad"]
+
+[filetype.sqlite]
+mimes = ["application/vnd.sqlite3"]
+
+[filetype.svg]
+mimes = ["image/svg+xml"]
+
+[filetype.text]
+mimes = ["text", "application/x-perl", "application/x-shellscript", "application/x-subrip"]
+
+[filetype.torrent]
+mimes = ["application/x-bittorrent"]
+
+[filetype.video]
+mimes = ["application/x-matroska", "video"]
+
+
+#
+# Handlers
+#
+# - command
+# The command to run to open or preview file.
+# Substitution is done for the following expressions:
+#   %c: terminal column count
+#   %i: input path
+#   %l: terminal line count
+# Use '%%' if you need to pass a literal '%' char.
+#
+# - shell
+# If true, runs the command in a shell, use this if you use pipes. Defaults to false.
+#
+# - wait
+# If true, waits for the handler to exit. Defaults to true.
+#
+# - stdin_arg
+# When previewing or opening data from stdin, with what string to substitute '%i'. Defaults to "-", some programs require "".
+#
+
+[default_handler_preview]
+command = "hexyl --border none -n 4096 %i"
+stdin_arg = ""
+
+[default_handler_open]
+command = "hexyl %i | less -R"
+shell = true
+stdin_arg = ""
+
+[handler_preview.archive]
+command = "bsdtar -tf %i | grep -v '/$' | head -n %l | tree -C --noreport --fromfile . | tail -n +2 | sed 's@^....@@'"
+shell = true
+
+[handler_preview.audio]
+command = "mediainfo %i | sed 's@ \\+: @: @' | column -s ':' -t | sed 's@ *$@@'"
+shell = true
+
+[handler_open.audio]
+command = "mpv %i"
+wait = false
+
+[handler_preview.binary]
+command = "hexyl --border none -n 4096 %i"
+stdin_arg = ""
+
+[handler_preview.deb]
+command = "dpkg -c %i | head -n %l"
+shell = true
+
+[handler_preview.directory]
+command = "lsd -alFh --tree --color=always --icon=always %i | head -n %l"
+shell = true
+
+[handler_open.directory]
+command = "lsd -alFh --tree --color=always --icon=always %i | less -R"
+shell = true
+
+[handler_preview.html]
+command = "w3m -dump %i"
+
+[handler_open.html]
+command = "firefox %i"
+wait = false
+
+[handler_preview.image]
+command = "chafa -s %cx%l %i"
+
+[handler_open.image]
+command = "imv %i"
+wait = false
+stdin_arg = "-"
+
+[handler_preview.markdown]
+command = "mdcat %i"
+
+[handler_open.markdown]
+command = "retext %i"
+wait = false
+
+[handler_preview.msdocument]
+command = "pandoc -s -t markdown -- %i | mdcat"
+shell = true
+
+[handler_open.msdocument]
+command = "libreoffice %i"
+wait = false
+
+[handler_preview.opendocument]
+command = "odt2txt %i"
+
+[handler_open.opendocument]
+command = "libreoffice %i"
+wait = false
+
+[handler_preview.pcap]
+command = "tshark -t a -r %i | head -n %l"
+shell = true
+
+[handler_open.pcap]
+command = "wireshark %i"
+wait = false
+
+[handler_preview.pdf]
+command = "t=$(mktemp); pdftoppm -f 1 -l 1 -scale-to-x 800 -scale-to-y -1 -singlefile -jpeg -jpegopt quality=60 -tiffcompression jpeg -- %i \"${t}\" && chafa -s %cx%l \"${t}.jpg\"; rm \"${t}.jpg\""
+shell = true
+
+[handler_open.pdf]
+command = "atril %i"
+wait = false
+
+[handler_open.scad]
+command = "openscad %i"
+wait = false
+
+[handler_preview.sqlite]
+command = "sqlite3 %i .dump | head -n %l"
+shell = true
+
+[handler_open.svg]
+command = "firefox %i"
+wait = false
+
+[handler_preview.text]
+command = "env COLORTERM=8bit bat -P --color=always -n --terminal-width %c -r :%l %i"
+
+[handler_open.text]
+command = "subl %i"
+
+[handler_preview.torrent]
+command = "transmission-show -- %i"
+
+[handler_preview.video]
+command = "ffmpegthumbnailer -s 800 -c jpg -q 6 -i %i -o - 2> /dev/null | chafa -s %cx%l -"
+shell = true
+
+[handler_open.video]
+command = "mpv %i"
+wait = false
