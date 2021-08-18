@@ -229,6 +229,8 @@ impl HandlerMapping {
         if handler.wait {
             command.status()?;
         } else {
+            command.stdout(Stdio::null());
+            command.stderr(Stdio::null());
             command.spawn()?;
         }
         Ok(())
