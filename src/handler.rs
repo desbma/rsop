@@ -250,10 +250,13 @@ impl HandlerMapping {
         let cmd = Self::substitute(&handler.command, &path, &term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
-        let mut child = Command::new(&cmd_args[0])
-            .args(&cmd_args[1..])
-            .stdin(Stdio::piped())
-            .spawn()?;
+        let mut command = Command::new(&cmd_args[0]);
+        command.args(&cmd_args[1..]).stdin(Stdio::piped());
+        if !handler.wait {
+            command.stdout(Stdio::null());
+            command.stderr(Stdio::null());
+        }
+        let mut child = command.spawn()?;
 
         let mut child_stdin = child.stdin.take().unwrap();
         child_stdin.write_all(header)?;
