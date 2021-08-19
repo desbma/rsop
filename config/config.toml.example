@@ -31,6 +31,9 @@ mimes = ["application/vnd.debian.binary-package"]
 [filetype.directory]
 mimes = ["inode/directory"]
 
+[filetype.guitar_tab]
+extensions = ["gp3", "gp4", "gp5", "ptb"]
+
 [filetype.html]
 extensions = ["htm", "html", "xhtml"]
 mimes = ["text/html"]
@@ -146,6 +149,10 @@ command = "chafa -s %cx%l %i"
 command = "imv %i"
 wait = false
 stdin_arg = "-"
+
+[handler_open.guitar_tab]
+command = "tuxguitar %i"
+wait = false
 
 [handler_preview.markdown]
 command = "mdcat %i"
