@@ -205,7 +205,7 @@ command = "firefox %i"
 wait = false
 
 [handler_preview.text]
-command = "env COLORTERM=8bit bat -P --color=always -n --terminal-width %c -r :%l %i"
+command = "bat -P --color=always -n --terminal-width %c -r :%l %i"
 
 [handler_open.text]
 command = "subl %i"
