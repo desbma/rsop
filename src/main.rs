@@ -45,6 +45,7 @@ fn main() {
     simple_logger::SimpleLogger::new()
         .init()
         .expect("Failed to init logger");
+    better_panic::install();
 
     // Parse command line opts
     let mode = runtime_mode();

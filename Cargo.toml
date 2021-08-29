@@ -5,6 +5,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
+better-panic = "0.2"
 lazy_static = "1.4"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 regex = "1.5"
