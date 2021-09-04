@@ -28,7 +28,7 @@ Compared to other `xdg-open` alternatives:
 - `rsop` does opening and previewing with a single self contained tool and config file
 - `rsop` is not tied to a file manager or a runtime environment, you only need the `rsop` binary and your config file and can use it in interactive terminal sessions, file managers, `fzf` invocations...
 - `rsop` is taylored for terminal users (especially the preview feature)
-- `rsop` is very fast (not that it matters in practice, but it's good to know)
+- `rsop` is very fast (see [performance](#performance) section))
 
 ## Installation
 
@@ -75,6 +75,17 @@ pa() {
 ```
 
 _TODO image_
+
+## Performance
+
+`rsop` is quite fast. In practice it rarely matters because choosing with which program to open or preview files is usually so quick it is not perceptible. However performance can matter if for example you are decompressing a huge `tar.gz` archive to preview its content.
+To help with that, `rsop` uses the [`splice` system call](https://man7.org/linux/man-pages/man2/splice.2.html) if available on your platform. In the `.tar.gz` example this allows decompressing data with `gzip` or `pigz` and passing it to tar (or whatever you have configured to handle `application/x-tar` MIME type), **without wasting time to copy data in user space** between the two programs.
+
+Other stuff `rsop` does to remain quick:
+
+- it is written in Rust (forgetting the RiiR memes, this avoid the 20-50ms startup time of for example Python interpreters)
+- it uses hashtables to search for handlers from MIME types or extensions in constant time
+- it uses the great [tree_magic_mini crate](https://crates.io/crates/tree_magic_mini) for fast MIME identification
 
 ## FAQ
 
