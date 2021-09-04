@@ -27,6 +27,9 @@ mimes = ["application/octet-stream"]
 [filetype.bzip2]
 mimes = ["application/x-bzip2"]
 
+[filetype.certificate]
+mimes = ["application/pkix-cert+pem"]
+
 [filetype.deb]
 mimes = ["application/vnd.debian.binary-package"]
 
@@ -73,7 +76,7 @@ mimes = ["application/vnd.sqlite3"]
 mimes = ["image/svg+xml"]
 
 [filetype.text]
-mimes = ["text", "application/x-perl", "application/x-shellscript", "application/x-subrip"]
+mimes = ["text", "application/x-perl", "application/x-shellscript", "application/x-subrip", "application/xml"]
 
 [filetype.torrent]
 mimes = ["application/x-bittorrent"]
@@ -133,6 +136,13 @@ wait = false
 [handler_preview.binary]
 command = "hexyl --border none -n 4096 %i"
 stdin_arg = ""
+
+[handler_preview.certificate]
+command = "openssl x509 -in %i -text"
+
+[handler_open.certificate]
+command = "openssl x509 -in %i -text | less -R"
+shell = true
 
 [handler_preview.deb]
 command = "dpkg -c %i | head -n %l"
