@@ -28,7 +28,7 @@ Compared to other `xdg-open` alternatives:
 - `rsop` does opening and previewing with a single self contained tool and config file
 - `rsop` is not tied to a file manager or a runtime environment, you only need the `rsop` binary and your config file and can use it in interactive terminal sessions, file managers, `fzf` invocations...
 - `rsop` is taylored for terminal users (especially the preview feature)
-- `rsop` is very fast (see [performance](#performance) section))
+- `rsop` is very fast (see [performance](#performance) section)
 
 ## Installation
 
