@@ -14,6 +14,9 @@
 # Compared to identification by extension this has the advantage of also working with data piped from stdin.
 #
 
+[filetype.gzip]
+mimes = ["application/gzip"]
+
 [filetype.text]
 mimes = ["text"]
 
@@ -50,3 +53,17 @@ command = "head -n %l %i"
 
 [handler_open.text]
 command = "less %i"
+
+
+#
+# Filters
+#
+# Filters are special handlers that process their input and send their output either to another filter or to a final handler.
+# They are typically useful to transparently decompress files like .log.xz, .pcapng.gz, tar.gz, etc.
+# but you can also use it for more specific needs like converting some document formats to markdown and then using your usual handler
+# for markdown files to preview or open it.
+# Filter configuration parameters are similar to handler, except wait that is implied as true.
+#
+
+[filter.gzip]
+command = "gzip -dc %i"

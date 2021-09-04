@@ -16,14 +16,16 @@
 #
 
 [filetype.archive]
-extensions = ["a", "ace", "alz", "arc", "arj", "bz", "bz2", "cab", "cpio", "gz", "jar", "lha", "lz", "lzh", "lzma", "lzo", "rpm", "rz", "t7z", "tar", "tbz", "tbz2", "tgz", "tlz", "txz", "tZ", "tzo", "war", "xpi", "xz", "Z", "zip", "zst"]
-mimes = ["application/gzip", "application/zip"]
+mimes = ["application/java-archive", "application/x-7z-compressed", "application/x-rar", "application/x-tar", "application/zip"]
 
 [filetype.audio]
 mimes = ["audio"]
 
 [filetype.binary]
 mimes = ["application/octet-stream"]
+
+[filetype.bzip2]
+mimes = ["application/x-bzip2"]
 
 [filetype.deb]
 mimes = ["application/vnd.debian.binary-package"]
@@ -33,6 +35,9 @@ mimes = ["inode/directory"]
 
 [filetype.guitar_tab]
 extensions = ["gp3", "gp4", "gp5", "ptb"]
+
+[filetype.gzip]
+mimes = ["application/gzip"]
 
 [filetype.html]
 extensions = ["htm", "html", "xhtml"]
@@ -75,6 +80,12 @@ mimes = ["application/x-bittorrent"]
 
 [filetype.video]
 mimes = ["application/x-matroska", "video"]
+
+[filetype.xz]
+mimes = ["application/x-xz"]
+
+[filetype.zstandard]
+mimes = ["application/zstd"]
 
 
 #
@@ -220,3 +231,26 @@ shell = true
 [handler_open.video]
 command = "mpv %i"
 wait = false
+
+
+#
+# Filters
+#
+# Filters are special handlers that process their input and send their output either to another filter or to a final handler.
+# They are typically useful to transparently decompress files like .log.xz, .pcapng.gz, tar.gz, etc.
+# but you can also use it for more specific needs like converting some document formats to markdown and then using your usual handler
+# for markdown files to preview or open it.
+# Filter configuration parameters are similar to handler, except wait that is implied as true.
+#
+
+[filter.bzip2]
+command = "bzip2 -dc %i"
+
+[filter.gzip]
+command = "gzip -dc %i"
+
+[filter.xz]
+command = "xz -dc %i"
+
+[filter.zstandard]
+command = "zstd -dc %i"

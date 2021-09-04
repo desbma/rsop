@@ -8,17 +8,23 @@ use std::io::{stdin, Read, Write};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::rc::Rc;
 
 use crate::config;
-use crate::config::Handler;
+use crate::config::{Filter, Handler};
 use crate::RsopMode;
 
 #[derive(Debug)]
+enum Processor {
+    Filter(Filter),
+    Handler(Handler),
+}
+
+#[derive(Debug)]
 struct Handlers {
-    extensions: HashMap<String, Rc<Handler>>,
-    mimes: HashMap<String, Rc<Handler>>,
+    extensions: HashMap<String, Rc<Processor>>,
+    mimes: HashMap<String, Rc<Processor>>,
 }
 
 impl Handlers {
@@ -29,12 +35,12 @@ impl Handlers {
         }
     }
 
-    pub fn add(&mut self, handler: Rc<Handler>, filetype: &config::Filetype) {
+    pub fn add(&mut self, processor: Rc<Processor>, filetype: &config::Filetype) {
         for extension in &filetype.extensions {
-            self.extensions.insert(extension.clone(), handler.clone());
+            self.extensions.insert(extension.clone(), processor.clone());
         }
         for mime in &filetype.mimes {
-            self.mimes.insert(mime.clone(), handler.clone());
+            self.mimes.insert(mime.clone(), processor.clone());
         }
     }
 }
@@ -51,10 +57,10 @@ pub struct HandlerMapping {
 const PIPE_INITIAL_READ_LENGTH: usize = 4096;
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
-trait ReadStdin: Read {}
+trait ReadStdin: Read + Send {}
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-trait ReadStdin: Read + AsRawFd {}
+trait ReadStdin: Read + AsRawFd + Send {}
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 impl ReadStdin for StdinLock<'_> {}
@@ -62,21 +68,35 @@ impl ReadStdin for StdinLock<'_> {}
 #[cfg(any(target_os = "linux", target_os = "android"))]
 impl ReadStdin for File {}
 
+impl ReadStdin for ChildStdout {}
+
 impl HandlerMapping {
     pub fn new(cfg: &config::Config) -> anyhow::Result<HandlerMapping> {
         let mut handlers_open = Handlers::new();
         let mut handlers_preview = Handlers::new();
         for (name, filetype) in &cfg.filetype {
-            let handler_open = cfg.handler_open.get(name).cloned().map(Rc::new);
-            let handler_preview = cfg.handler_preview.get(name).cloned().map(Rc::new);
-            if handler_open.is_none() && handler_preview.is_none() {
-                anyhow::bail!("Filetype {} has no handler", name);
+            let handler_open = cfg.handler_open.get(name).cloned();
+            let handler_preview = cfg.handler_preview.get(name).cloned();
+            let filter = cfg.filter.get(name).cloned();
+            if handler_open.is_none() && handler_preview.is_none() && filter.is_none() {
+                anyhow::bail!("Filetype {} is not bound to any handler or filter", name);
+            }
+            if (handler_open.is_some() || handler_preview.is_some()) && filter.is_some() {
+                anyhow::bail!(
+                    "Filetype {} can not be bound to both a filter and a handler",
+                    name
+                );
             }
             if let Some(handler_open) = handler_open {
-                handlers_open.add(handler_open, filetype);
+                handlers_open.add(Rc::new(Processor::Handler(handler_open)), filetype);
             }
             if let Some(handler_preview) = handler_preview {
-                handlers_preview.add(handler_preview, filetype);
+                handlers_preview.add(Rc::new(Processor::Handler(handler_preview)), filetype);
+            }
+            if let Some(filter) = filter {
+                let proc_filter = Rc::new(Processor::Filter(filter));
+                handlers_open.add(proc_filter.clone(), filetype);
+                handlers_preview.add(proc_filter, filetype);
             }
         }
         Ok(HandlerMapping {
@@ -88,55 +108,58 @@ impl HandlerMapping {
     }
 
     pub fn handle_path(&self, mode: RsopMode, path: &Path) -> anyhow::Result<()> {
-        let (handlers, default_handler) = match mode {
-            RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
-            RsopMode::Open => (&self.handlers_open, &self.default_handler_open),
-        };
-        Self::dispatch_path(path, handlers, default_handler)
+        self.dispatch_path(path, &mode)
     }
 
     pub fn handle_pipe(&self, mode: RsopMode) -> anyhow::Result<()> {
+        let stdin = Self::stdin_reader()?;
+        self.dispatch_pipe(stdin, &mode)
+    }
+
+    fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> anyhow::Result<()> {
+        // Handler candidates
         let (handlers, default_handler) = match mode {
             RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
             RsopMode::Open => (&self.handlers_open, &self.default_handler_open),
         };
-        Self::dispatch_pipe(handlers, default_handler)
-    }
 
-    fn dispatch_path(
-        path: &Path,
-        handlers: &Handlers,
-        default_handler: &Handler,
-    ) -> anyhow::Result<()> {
         let extension = path.extension().map(|e| e.to_str()).flatten();
         if let Some(extension) = extension {
             if let Some(handler) = handlers.extensions.get(extension) {
-                return Self::run_path(handler, path);
+                return self.run_path(handler, path, mode);
             }
         }
         let mime = tree_magic_mini::from_filepath(path);
         log::debug!("MIME: {:?}", mime);
         if let Some(mime) = mime {
             if let Some(handler) = handlers.mimes.get(mime) {
-                return Self::run_path(handler, path);
+                return self.run_path(handler, path, mode);
             }
 
             // Try "main" MIME type
             let mime_main = mime.split('/').next();
             if let Some(mime_main) = mime_main {
                 if let Some(handler) = handlers.mimes.get(mime_main) {
-                    return Self::run_path(handler, path);
+                    return self.run_path(handler, path, mode);
                 }
             }
         }
 
         // Fallback
-        Self::run_path(default_handler, path)
+        self.run_path(&Processor::Handler(default_handler.to_owned()), path, mode)
     }
 
-    fn dispatch_pipe(handlers: &Handlers, default_handler: &Handler) -> anyhow::Result<()> {
+    fn dispatch_pipe<T>(&self, mut reader: T, mode: &RsopMode) -> anyhow::Result<()>
+    where
+        T: ReadStdin,
+    {
+        // Handler candidates
+        let (handlers, default_handler) = match mode {
+            RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
+            RsopMode::Open => (&self.handlers_open, &self.default_handler_open),
+        };
+
         // Read header
-        let mut reader = Self::stdin_reader()?;
         let mut buffer = [0; PIPE_INITIAL_READ_LENGTH];
         let header_len = reader.read(&mut buffer)?;
         let header = &buffer[0..header_len];
@@ -145,19 +168,24 @@ impl HandlerMapping {
         log::debug!("MIME: {:?}", mime);
 
         if let Some(handler) = handlers.mimes.get(mime) {
-            return Self::run_pipe(handler, header, reader);
+            return self.run_pipe(handler, header, reader, mode);
         }
 
         // Try "main" MIME type
         let mime_main = mime.split('/').next();
         if let Some(mime_main) = mime_main {
             if let Some(handler) = handlers.mimes.get(mime_main) {
-                return Self::run_pipe(handler, header, reader);
+                return self.run_pipe(handler, header, reader, mode);
             }
         }
 
         // Fallback
-        Self::run_pipe(default_handler, header, reader)
+        self.run_pipe(
+            &Processor::Handler(default_handler.to_owned()),
+            header,
+            reader,
+            mode,
+        )
     }
 
     fn substitute(s: &str, path: &Path, term_size: &termsize::Size) -> String {
@@ -218,10 +246,45 @@ impl HandlerMapping {
         }
     }
 
-    fn run_path(handler: &Handler, path: &Path) -> anyhow::Result<()> {
+    fn run_path(&self, processor: &Processor, path: &Path, mode: &RsopMode) -> anyhow::Result<()> {
         let term_size = Self::term_size();
 
-        let cmd = Self::substitute(&handler.command, path, &term_size);
+        match processor {
+            Processor::Handler(handler) => self.run_path_handler(handler, path, &term_size),
+            Processor::Filter(filter) => {
+                let mut filter_child = self.run_path_filter(filter, path, &term_size)?;
+                let r = self.dispatch_pipe(filter_child.stdout.take().unwrap(), mode);
+                filter_child.kill()?;
+                filter_child.wait()?;
+                r
+            }
+        }
+    }
+
+    fn run_path_filter(
+        &self,
+        filter: &Filter,
+        path: &Path,
+        term_size: &termsize::Size,
+    ) -> anyhow::Result<Child> {
+        let cmd = Self::substitute(&filter.command, path, term_size);
+        let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
+
+        let mut command = Command::new(&cmd_args[0]);
+        command
+            .args(&cmd_args[1..])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped());
+        Ok(command.spawn()?)
+    }
+
+    fn run_path_handler(
+        &self,
+        handler: &Handler,
+        path: &Path,
+        term_size: &termsize::Size,
+    ) -> anyhow::Result<()> {
+        let cmd = Self::substitute(&handler.command, path, term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -236,18 +299,76 @@ impl HandlerMapping {
         Ok(())
     }
 
-    fn run_pipe<T>(handler: &Handler, header: &[u8], mut stdin: T) -> anyhow::Result<()>
+    fn run_pipe<T>(
+        &self,
+        processor: &Processor,
+        header: &[u8],
+        mut stdin: T,
+        mode: &RsopMode,
+    ) -> anyhow::Result<()>
     where
         T: ReadStdin,
     {
         let term_size = Self::term_size();
 
+        match processor {
+            Processor::Handler(handler) => {
+                self.run_pipe_handler(handler, header, stdin, &term_size)
+            }
+            Processor::Filter(filter) => crossbeam_utils::thread::scope(|scope| {
+                let mut filter_child = self.run_pipe_filter(filter, &term_size)?;
+                let mut filter_child_stdin = filter_child.stdin.take().unwrap();
+                let filter_child_stdout = filter_child.stdout.take().unwrap();
+                scope.spawn(move |_| {
+                    Self::pipe_forward(&mut stdin, &mut filter_child_stdin, header)
+                        .expect("Pipe forward failed in thread")
+                });
+                let r = self.dispatch_pipe(filter_child_stdout, mode);
+                filter_child.kill()?;
+                filter_child.wait()?;
+                r
+            })
+            .unwrap(),
+        }
+    }
+
+    fn run_pipe_filter(
+        &self,
+        filter: &Filter,
+        term_size: &termsize::Size,
+    ) -> anyhow::Result<Child> {
+        let path = if let Some(stdin_arg) = &filter.stdin_arg {
+            PathBuf::from(stdin_arg)
+        } else {
+            PathBuf::from("-")
+        };
+        let cmd = Self::substitute(&filter.command, &path, term_size);
+        let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
+
+        let mut command = Command::new(&cmd_args[0]);
+        command
+            .args(&cmd_args[1..])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped());
+        Ok(command.spawn()?)
+    }
+
+    fn run_pipe_handler<T>(
+        &self,
+        handler: &Handler,
+        header: &[u8],
+        mut stdin: T,
+        term_size: &termsize::Size,
+    ) -> anyhow::Result<()>
+    where
+        T: ReadStdin,
+    {
         let path = if let Some(stdin_arg) = &handler.stdin_arg {
             PathBuf::from(stdin_arg)
         } else {
             PathBuf::from("-")
         };
-        let cmd = Self::substitute(&handler.command, &path, &term_size);
+        let cmd = Self::substitute(&handler.command, &path, term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -259,12 +380,9 @@ impl HandlerMapping {
         let mut child = command.spawn()?;
 
         let mut child_stdin = child.stdin.take().unwrap();
-        child_stdin.write_all(header)?;
-        log::trace!("Header written ({} bytes)", header.len());
-
-        let copied = Self::pipe_copy(&mut stdin, &mut child_stdin)?;
-        log::trace!("Pipe exhausted, copied {} bytes", copied);
+        Self::pipe_forward(&mut stdin, &mut child_stdin, header)?;
         drop(child_stdin);
+
         if handler.wait {
             child.wait()?;
         }
@@ -291,41 +409,61 @@ impl HandlerMapping {
 
     #[cfg(not(any(target_os = "linux", target_os = "android")))]
     // Default chunk copy using stdlib's std::io::cpy when splice syscall is not available
-    fn pipe_copy<S, D>(src: &mut S, dst: &mut D) -> anyhow::Result<u64>
+    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<u64>
     where
         S: Read,
         D: Write,
     {
-        Ok(copy(src, dst)?)
+        dst.write_all(header)?;
+        log::trace!("Header written ({} bytes)", header.len());
+
+        let copied = copy(src, dst)?;
+        log::trace!(
+            "Pipe exhausted, moved {} bytes total",
+            header.len() + copied
+        );
+
+        Ok(header.len() + copied)
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
     // Efficient 0-copy implementation using splice
-    fn pipe_copy<S, D>(src: &mut S, dst: &mut D) -> anyhow::Result<usize>
+    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<usize>
     where
         S: AsRawFd,
         D: AsRawFd + Write,
     {
+        dst.write_all(header)?;
+        log::trace!("Header written ({} bytes)", header.len());
+
         let mut c = 0;
         const SPLICE_LEN: usize = usize::MAX;
         const SPLICE_FLAGS: nix::fcntl::SpliceFFlags = nix::fcntl::SpliceFFlags::empty();
 
         loop {
-            let moved = nix::fcntl::splice(
+            let rc = nix::fcntl::splice(
                 src.as_raw_fd(),
                 None,
                 dst.as_raw_fd(),
                 None,
                 SPLICE_LEN,
                 SPLICE_FLAGS,
-            )?;
+            );
+            let moved = match rc {
+                Err(e) if e == nix::errno::Errno::EPIPE => 0,
+                Err(e) => return Err(anyhow::Error::new(e)),
+                Ok(m) => m,
+            };
             log::trace!("moved = {}", moved);
             if moved == 0 {
                 break;
             }
             c += moved;
         }
-        Ok(c)
+
+        log::trace!("Pipe exhausted, moved {} bytes total", header.len() + c);
+
+        Ok(header.len() + c)
     }
 
     fn build_cmd(cmd: &str, shell: bool) -> anyhow::Result<Vec<String>> {

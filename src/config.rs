@@ -25,6 +25,14 @@ const fn default_handler_wait() -> bool {
     true
 }
 
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct Filter {
+    pub command: String,
+    #[serde(default)]
+    pub shell: bool,
+    pub stdin_arg: Option<String>,
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Config {
     pub filetype: HashMap<String, Filetype>,
@@ -34,6 +42,8 @@ pub struct Config {
 
     pub handler_open: HashMap<String, Handler>,
     pub default_handler_open: Handler,
+
+    pub filter: HashMap<String, Filter>,
 }
 
 pub fn parse_config() -> anyhow::Result<Config> {
