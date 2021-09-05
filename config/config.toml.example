@@ -218,7 +218,7 @@ command = "openscad %i"
 wait = false
 
 [handler_preview.sqlite]
-command = "sqlite3 %i .dump | head -n %l"
+command = "sqlite3 %i .dump | bat -P --color=always -n --terminal-width %c -r :%l -l sql"
 shell = true
 
 [handler_open.svg]
