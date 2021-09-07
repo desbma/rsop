@@ -5,9 +5,9 @@
 
 Simple, fast & configurable tool to open and preview files.
 
-Alternative to `xdg-open` and its various clones.
+Ideal for use with terminal file managers (ranger, lf, nnn, etc.). Can also be used as a general alternative to `xdg-open` and its various clones.
 
-If you spend most time in a terminal, and are unsatisfied by current solutions to associate file types with handler programs, this tool may be for you. If you are a [`ranger`](https://github.com/ranger/ranger) user, this replaces both `rifle` and `scope.sh`, with a single tool and configuration file.
+If you spend most time in a terminal, and are unsatisfied by current solutions to associate file types with handler programs, this tool may be for you.
 
 **This tool is a work in progress, not ready to be used yet.**
 
@@ -50,9 +50,38 @@ See comments and example in that file to set up file types and handlers for your
 
 A more advanced example configuration file is also available [here](./config/config.toml.example).
 
+### Usage with ranger
+
+**Warning: because ranger is build on Python's old ncurses version, the preview panel only supports 8bit colors (see https://github.com/ranger/ranger/issues/690#issuecomment-255590479), so if the output seems wrong you may need to tweak handlers to generate 8bit colors instead of 24.**
+
+In `rifle.conf`:
+
+    = rso "$@"
+
+In `scope.sh`:
+
+    RSOP_MODE=open COLUMNS="$2" LINES="$3" exec rsop "$1"
+
+### Usage with lf
+
+Add in `lfrc`:
+
+    set filesep "\n"
+    set ifs "\n"
+    set previewer ~/.config/lf/preview
+    cmd open ${{
+       for f in ${fx[@]}; do rso "${f}"; done;
+       lf -remote "send $id redraw";
+    }}
+
+And create `~/.config/lf/preview` with:
+
+    #!/bin/sh
+    RSOP_MODE=preview COLUMNS="$2" LINES="$3" exec rsop "$1"
+
 ## Show me some cool stuff `rsop` can do
 
-- Simple file explorer, using [fd](https://github.com/sharkdp/fd) and [fzf](https://github.com/junegunn/fzf), using `rso` to preview files and `rsp` to open them:
+- Simple file explorer with fuzzy searching, using [fd](https://github.com/sharkdp/fd) and [fzf](https://github.com/junegunn/fzf), using `rso` to preview files and `rsp` to open them:
 
 ```
 fd . | fzf --preview='rsp {}' | xargs rso
