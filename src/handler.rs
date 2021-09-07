@@ -5,6 +5,7 @@ use std::fs::File;
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 use std::io::{copy, StdinLock};
 use std::io::{stdin, Read, Write};
+use std::os::unix::fs::FileTypeExt;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
@@ -129,8 +130,18 @@ impl HandlerMapping {
                 return self.run_path(handler, path, mode);
             }
         }
-        let mime = tree_magic_mini::from_filepath(path);
+
+        // Rather than read socket/pipe, mimic 'file -ib xxx' behavior and return 'inode/yyy' strings
+        let file_type = path.metadata()?.file_type();
+        let mime = if file_type.is_socket() {
+            Some("inode/socket")
+        } else if file_type.is_fifo() {
+            Some("inode/fifo")
+        } else {
+            tree_magic_mini::from_filepath(path)
+        };
         log::debug!("MIME: {:?}", mime);
+
         if let Some(mime) = mime {
             if let Some(handler) = handlers.mimes.get(mime) {
                 return self.run_path(handler, path, mode);

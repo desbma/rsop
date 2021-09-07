@@ -70,8 +70,8 @@ Add in `lfrc`:
     set ifs "\n"
     set previewer ~/.config/lf/preview
     cmd open ${{
-       for f in ${fx[@]}; do rso "${f}"; done;
-       lf -remote "send $id redraw";
+       for f in ${fx[@]}; do rso "${f}"; done
+       lf -remote "send $id redraw"
     }}
 
 And create `~/.config/lf/preview` with:
