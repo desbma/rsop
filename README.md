@@ -14,9 +14,10 @@ If you spend most time in a terminal, and are unsatisfied by current solutions t
 ## Features
 
 - Start program to view/edit file according to extension or MIME type
-- Provides two tools (in a single binary):
+- Provides three commands (all symlinks to a single `rsop` binary):
   - `rso`: open file (`xdg-open` replacement)
   - `rsp`: preview files in terminal, to be used for example in terminal file managers or [`fzf`](https://github.com/junegunn/fzf) preview panel
+  - `rsi`: to identiy MIME type
 - Supports opening and previewing from data piped on stdin (very handy for advanced shell scripting, see [below](#show-me-some-cool-stuff-rsop-can-do))
 - Supports chainable filters to preprocess data (for example to transparently handle `.log.xz` files)
 - Simple config file (no regex or funky conditionals) to describe file formats, handlers, and associate both
@@ -40,6 +41,7 @@ strip --strip-all target/release/rsop
 install -Dm 755 -t /usr/local/bin target/release/rsop
 ln -rsv /usr/local/bin/rs{op,p}
 ln -rsv /usr/local/bin/rs{op,o}
+ln -rsv /usr/local/bin/rs{op,i}
 ```
 
 ## Configuration

@@ -117,17 +117,20 @@ impl HandlerMapping {
         self.dispatch_pipe(stdin, &mode)
     }
 
+    #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> anyhow::Result<()> {
         // Handler candidates
         let (handlers, default_handler) = match mode {
             RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
-            RsopMode::Open => (&self.handlers_open, &self.default_handler_open),
+            RsopMode::Open | _ => (&self.handlers_open, &self.default_handler_open),
         };
 
-        let extension = path.extension().map(|e| e.to_str()).flatten();
-        if let Some(extension) = extension {
-            if let Some(handler) = handlers.extensions.get(extension) {
-                return self.run_path(handler, path, mode);
+        if *mode != RsopMode::Identify {
+            let extension = path.extension().map(|e| e.to_str()).flatten();
+            if let Some(extension) = extension {
+                if let Some(handler) = handlers.extensions.get(extension) {
+                    return self.run_path(handler, path, mode);
+                }
             }
         }
 
@@ -141,6 +144,10 @@ impl HandlerMapping {
             tree_magic_mini::from_filepath(path)
         };
         log::debug!("MIME: {:?}", mime);
+        if let RsopMode::Identify = mode {
+            println!("{}", mime.unwrap());
+            return Ok(());
+        }
 
         if let Some(mime) = mime {
             if let Some(handler) = handlers.mimes.get(mime) {
@@ -160,6 +167,7 @@ impl HandlerMapping {
         self.run_path(&Processor::Handler(default_handler.to_owned()), path, mode)
     }
 
+    #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_pipe<T>(&self, mut reader: T, mode: &RsopMode) -> anyhow::Result<()>
     where
         T: ReadStdin,
@@ -167,7 +175,7 @@ impl HandlerMapping {
         // Handler candidates
         let (handlers, default_handler) = match mode {
             RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
-            RsopMode::Open => (&self.handlers_open, &self.default_handler_open),
+            RsopMode::Open | _ => (&self.handlers_open, &self.default_handler_open),
         };
 
         // Read header
@@ -177,6 +185,10 @@ impl HandlerMapping {
 
         let mime = tree_magic_mini::from_u8(header);
         log::debug!("MIME: {:?}", mime);
+        if let RsopMode::Identify = mode {
+            println!("{}", mime);
+            return Ok(());
+        }
 
         if let Some(handler) = handlers.mimes.get(mime) {
             return self.run_pipe(handler, header, reader, mode);

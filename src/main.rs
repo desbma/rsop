@@ -2,16 +2,19 @@ use std::env;
 use std::str::FromStr;
 
 use structopt::StructOpt;
+use strum::VariantNames;
 
 mod cli;
 mod config;
 mod handler;
 
-#[derive(Debug, strum_macros::EnumString)]
+#[derive(Debug, PartialEq, strum_macros::EnumString, strum_macros::EnumVariantNames)]
 #[strum(ascii_case_insensitive)]
+#[strum(serialize_all = "lowercase")]
 pub enum RsopMode {
     Preview,
     Open,
+    Identify,
 }
 
 fn runtime_mode() -> RsopMode {
@@ -30,12 +33,14 @@ fn runtime_mode() -> RsopMode {
     {
         "rsp" => return RsopMode::Preview,
         "rso" => return RsopMode::Open,
+        "rsi" => return RsopMode::Identify,
         _ => {}
     }
 
     log::warn!(
         "Ambiguous preview/open runtime mode, defaulting to open. \
-         Please use rso/rsp commands or set RSOP_MODE to either 'open' or 'preview'."
+         Please use rso/rsp/rsi commands or set RSOP_MODE to either {}.",
+        RsopMode::VARIANTS.join("/")
     );
     RsopMode::Open
 }
