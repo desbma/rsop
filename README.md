@@ -17,7 +17,7 @@ If you spend most time in a terminal, and are unsatisfied by current solutions t
 - Provides three commands (all symlinks to a single `rsop` binary):
   - `rso`: open file (`xdg-open` replacement)
   - `rsp`: preview files in terminal, to be used for example in terminal file managers or [`fzf`](https://github.com/junegunn/fzf) preview panel
-  - `rsi`: to identiy MIME type
+  - `rsi`: to identify MIME type
 - Supports opening and previewing from data piped on stdin (very handy for advanced shell scripting, see [below](#show-me-some-cool-stuff-rsop-can-do))
 - Supports chainable filters to preprocess data (for example to transparently handle `.log.xz` files)
 - Simple config file (no regex or funky conditionals) to describe file formats, handlers, and associate both
