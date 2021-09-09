@@ -86,26 +86,27 @@ And create `~/.config/lf/preview` with:
 - Simple file explorer with fuzzy searching, using [fd](https://github.com/sharkdp/fd) and [fzf](https://github.com/junegunn/fzf), using `rso` to preview files and `rsp` to open them:
 
 ```
-fd . | fzf --preview='rsp {}' | xargs rso
+fd . | fzf --preview='rsp {}' | xargs -r rso
 ```
 
-_TODO image_
+[![file explorer](./demo/file-explorer.gif)](https://raw.githubusercontent.com/desbma/rsop/master/demo/file-explorer.gif)
 
 - Preview files inside an archive, **without decompressing it entirely**, select one and open it (uses [`bstdtar`](https://www.libarchive.org/), [`fzf`](https://github.com/junegunn/fzf) and `rso`/`rsp`):
 
 ```
-# preview archive
+# preview archive (.tar, .tar.gz, .zip, .7z, etc.)
+# usage: pa <archive file path>
 pa() {
     local -r archive="${1:?}"
     bsdtar -tf "${archive}" |
         grep -v '/$' |
-        fzf -m --preview="bsdtar -xOf \"${archive}\" {} | rsp" |
+        fzf --preview="bsdtar -xOf \"${archive}\" {} | rsp" |
         xargs -r bsdtar -xOf "${archive}" |
         rso
 }
 ```
 
-_TODO image_
+[![preview archive](./demo/preview-archive.gif)](https://raw.githubusercontent.com/desbma/rsop/master/demo/preview-archive.gif)
 
 ## Performance
 

@@ -1,0 +1,9 @@
+#!/bin/bash -eu
+
+readonly OUTPUT="${1:?}"
+
+reset
+
+t-rec -q -d none -n -s 300ms -e 800ms "$SHELL"
+
+mv t-rec.gif "${OUTPUT}"

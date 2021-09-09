@@ -1,0 +1,29 @@
+#!/bin/bash -eu
+
+set -o pipefail
+
+ensure_sample() {
+    local -r url="${1:?}"
+    local -r ext="${2:-${url##*.}}"
+    local -t output="sample.${ext}"
+
+    if [ ! -f "${output}" ]
+    then
+        curl "${url}" -o "${output}"
+    fi
+}
+
+cd "$(dirname -- "$0")"
+
+if [ "${1:-}" = 'clean' ]
+then
+    rm -f sample.*
+
+else
+    # https://commons.wikimedia.org/wiki/Category:Commons_sample_files
+    ensure_sample 'https://upload.wikimedia.org/wikipedia/commons/4/4d/GridRPC_paradigm.pdf'
+    ensure_sample 'https://upload.wikimedia.org/wikipedia/commons/5/5a/Test-kdenlive-title.webm'
+    ensure_sample 'https://upload.wikimedia.org/wikipedia/commons/8/8d/Qsicon_inArbeit_%28jha%29.svg'
+    cp ../src/handler.rs sample.rs
+    cp ../README.md sample.md
+fi
