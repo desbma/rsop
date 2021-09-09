@@ -1,5 +1,6 @@
 #
 # This is a default minimal config file for rsop.
+# For a more advanced config example, see https://raw.githubusercontent.com/desbma/rsop/master/config/config.toml.example
 # You most likely want to edit this file to fit your needs.
 #
 
