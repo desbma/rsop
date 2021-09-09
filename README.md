@@ -91,7 +91,7 @@ fd . | fzf --preview='rsp {}' | xargs -r rso
 
 [![file explorer](./demo/file-explorer.gif)](https://raw.githubusercontent.com/desbma/rsop/master/demo/file-explorer.gif)
 
-- Preview files inside an archive, **without decompressing it entirely**, select one and open it (uses [`bstdtar`](https://www.libarchive.org/), [`fzf`](https://github.com/junegunn/fzf) and `rso`/`rsp`):
+- Preview files inside an archive, **without decompressing it entirely**, select one and open it (uses [`bsdtar`](https://www.libarchive.org/), [`fzf`](https://github.com/junegunn/fzf) and `rso`/`rsp`):
 
 ```
 # preview archive (.tar, .tar.gz, .zip, .7z, etc.)
