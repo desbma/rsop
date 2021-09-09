@@ -1,6 +1,42 @@
 #
 # This is an example of config file for rsop, showing advanced usage.
-# To use it you may need to install external programs invoked by handler commands like bat, chafa, hexyl, lsd, mdcat, odt2txt, pandoc, etc.
+#
+# It makes use of many external programs you may need to install from your distribution packages or from source:
+# - atril  https://github.com/mate-desktop/atril
+# - bat  https://github.com/sharkdp/bat
+# - bsdtar  https://www.libarchive.org/
+# - chafa  https://hpjansson.org/chafa/
+# - delta  https://github.com/dandavison/delta
+# - dpkg  https://wiki.debian.org/Teams/Dpkg
+# - ffmpegthumbnailer  https://github.com/dirkvdb/ffmpegthumbnailer
+# - firefox  https://firefox.com/
+# - hexyl  https://github.com/sharkdp/hexyl
+# - imv  https://github.com/eXeC64/imv
+# - libreoffice  https://www.libreoffice.org/
+# - lsd  https://github.com/Peltoche/lsd
+# - mdcat  https://github.com/lunaryorn/mdcat
+# - mediainfo  https://mediaarea.net/en/MediaInfo
+# - mpv  https://mpv.io/
+# - odt2txt  https://github.com/dstosberg/odt2txt/
+# - openscad  https://openscad.org/
+# - openssl  https://www.openssl.org/
+# - pandoc  https://pandoc.org/
+# - pbzip2  http://compression.ca/pbzip2/
+# - pigz  https://www.zlib.net/pigz/
+# - pdftoppm  https://poppler.freedesktop.org/
+# - retext  https://github.com/retext-project/retext
+# - sqlite3  https://www.sqlite.org/index.html
+# - ss  https://git.kernel.org/pub/scm/network/iproute2/iproute2.git
+# - subl  https://www.sublimetext.com/
+# - transmission-show  https://transmissionbt.com/
+# - tree  http://mama.indstate.edu/users/ice/tree/
+# - tshark  https://www.wireshark.org/
+# - tuxguitar  http://www.tuxguitar.com.ar/
+# - w3m  https://salsa.debian.org/debian/w3m
+# - wireshark  https://www.wireshark.org/
+# - xz  https://tukaani.org/xz/
+# - zstd  https://facebook.github.io/zstd/
+#
 # You most likely want to edit this file to fit your needs.
 #
 
@@ -48,6 +84,7 @@ mimes = ["text/html"]
 
 [filetype.image]
 mimes = ["image"]
+extensions = ["svg"]
 
 [filetype.markdown]
 extensions = ["md"]
@@ -60,6 +97,9 @@ mimes = ["application/vnd.openxmlformats-officedocument.wordprocessingml.documen
 extensions = ["odg", "odp", "ods", "odt"]
 mimes = ["application/vnd.oasis.opendocument.spreadsheet", "application/vnd.oasis.opendocument.text"]
 
+[filetype.patch]
+mimes = ["text/x-patch"]
+
 [filetype.pcap]
 mimes = ["application/vnd.tcpdump.pcap", "application/x-pcapng"]
 
@@ -69,20 +109,21 @@ mimes = ["application/pdf"]
 [filetype.scad]
 extensions = ["scad"]
 
+[filetype.socket]
+mimes = ["inode/socket"]
+
 [filetype.sqlite]
 mimes = ["application/vnd.sqlite3"]
 
-[filetype.svg]
-mimes = ["image/svg+xml"]
-
 [filetype.text]
-mimes = ["text", "application/x-perl", "application/x-shellscript", "application/x-subrip", "application/xml"]
+mimes = ["text", "application/pkcs8+pem", "application/x-perl", "application/x-shellscript", "application/x-subrip", "application/xml"]
 
 [filetype.torrent]
 mimes = ["application/x-bittorrent"]
 
 [filetype.video]
 mimes = ["application/x-matroska", "video"]
+extensions = ["ogv"]
 
 [filetype.xz]
 mimes = ["application/x-xz"]
@@ -113,7 +154,8 @@ mimes = ["application/zstd"]
 #
 
 [default_handler_preview]
-command = "hexyl --border none -n 4096 %i"
+command = "hexyl --border none %i | head -n %l"
+shell = true
 stdin_arg = ""
 
 [default_handler_open]
@@ -134,7 +176,8 @@ command = "mpv %i"
 wait = false
 
 [handler_preview.binary]
-command = "hexyl --border none -n 4096 %i"
+command = "hexyl --border none %i | head -n %l"
+shell = true
 stdin_arg = ""
 
 [handler_preview.certificate]
@@ -197,6 +240,10 @@ command = "odt2txt %i"
 command = "libreoffice %i"
 wait = false
 
+[handler_preview.patch]
+command = "cat %i | delta"
+shell = true
+
 [handler_preview.pcap]
 command = "tshark -t a -r %i | head -n %l"
 shell = true
@@ -217,13 +264,12 @@ wait = false
 command = "openscad %i"
 wait = false
 
+[handler_preview.socket]
+command = "ss -alxp src unix:'%i'"
+
 [handler_preview.sqlite]
 command = "sqlite3 %i .dump | bat -P --color=always -n --terminal-width %c -r :%l -l sql"
 shell = true
-
-[handler_open.svg]
-command = "firefox %i"
-wait = false
 
 [handler_preview.text]
 command = "bat -P --color=always -n --terminal-width %c -r :%l %i"
@@ -254,10 +300,10 @@ wait = false
 #
 
 [filter.bzip2]
-command = "bzip2 -dc %i"
+command = "pbzip2 -dc %i"
 
 [filter.gzip]
-command = "gzip -dc %i"
+command = "pigz -dc %i"
 
 [filter.xz]
 command = "xz -dc %i"
