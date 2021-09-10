@@ -52,7 +52,7 @@
 #
 
 [filetype.archive]
-mimes = ["application/java-archive", "application/x-7z-compressed", "application/x-rar", "application/x-tar", "application/zip"]
+mimes = ["application/java-archive", "application/vnd.rar", "application/x-7z-compressed", "application/x-rar", "application/x-tar", "application/zip"]
 
 [filetype.audio]
 mimes = ["audio"]
