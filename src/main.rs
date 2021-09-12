@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::str::FromStr;
 
@@ -8,13 +9,37 @@ mod cli;
 mod config;
 mod handler;
 
-#[derive(Debug, PartialEq, strum_macros::EnumString, strum_macros::EnumVariantNames)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    strum_macros::EnumString,
+    strum_macros::EnumVariantNames,
+    strum_macros::ToString,
+)]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "lowercase")]
 pub enum RsopMode {
     Preview,
     Open,
     Identify,
+}
+
+impl Default for RsopMode {
+    fn default() -> Self {
+        RsopMode::Open
+    }
+}
+
+lazy_static::lazy_static! {
+    static ref BIN_NAME_TO_MODE: BTreeMap<&'static str, RsopMode> = {
+        let mut m = BTreeMap::new();
+        m.insert("rsp", RsopMode::Preview);
+        m.insert("rso", RsopMode::Open);
+        m.insert("xdg-open", RsopMode::Open);
+        m.insert("rsi", RsopMode::Identify);
+        m
+    };
 }
 
 fn runtime_mode() -> RsopMode {
@@ -26,23 +51,29 @@ fn runtime_mode() -> RsopMode {
     }
 
     // Get from binary name
-    match env::args()
-        .next()
-        .unwrap_or_else(|| "".to_string())
-        .as_str()
-    {
-        "rsp" => return RsopMode::Preview,
-        "rso" => return RsopMode::Open,
-        "rsi" => return RsopMode::Identify,
-        _ => {}
+    if let Some(mode) = BIN_NAME_TO_MODE.get(
+        env::args()
+            .next()
+            .unwrap_or_else(|| "".to_string())
+            .as_str(),
+    ) {
+        return mode.to_owned();
     }
 
+    let mut sorted_variants = Vec::from(RsopMode::VARIANTS);
+    sorted_variants.sort_unstable();
     log::warn!(
-        "Ambiguous preview/open runtime mode, defaulting to open. \
-         Please use rso/rsp/rsi commands or set RSOP_MODE to either {}.",
-        RsopMode::VARIANTS.join("/")
+        "Ambiguous runtime mode, defaulting to {}. \
+         Please use one of the {} commands or set RSOP_MODE to either {}.",
+        RsopMode::default().to_string(),
+        BIN_NAME_TO_MODE
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("/"),
+        sorted_variants.join("/")
     );
-    RsopMode::Open
+    RsopMode::default()
 }
 
 fn main() {

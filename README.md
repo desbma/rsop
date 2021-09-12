@@ -42,6 +42,8 @@ install -Dm 755 -t /usr/local/bin target/release/rsop
 ln -rsv /usr/local/bin/rs{op,p}
 ln -rsv /usr/local/bin/rs{op,o}
 ln -rsv /usr/local/bin/rs{op,i}
+# to replace system xdg-open:
+ln -rsv /usr/local/bin/{rsop,xdg-open}
 ```
 
 ## Configuration
