@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## _unreleased_
 
+### Documentation
+
+- Use git-cliff to generate changelog
+
+### Features
+
+- Support file:// url prefix
+
 ### Refactor
 
 - Remove duplicate/hardcoded strings in mode handling

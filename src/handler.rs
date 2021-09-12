@@ -109,7 +109,19 @@ impl HandlerMapping {
     }
 
     pub fn handle_path(&self, mode: RsopMode, path: &Path) -> anyhow::Result<()> {
-        self.dispatch_path(path, &mode)
+        let parsed_path = if let Ok(url) = url::Url::parse(
+            path.to_str()
+                .ok_or_else(|| anyhow::anyhow!("Unable to decode path {:?}", path))?,
+        ) {
+            // TODO handle other schemes
+            let url_path = &url[url::Position::BeforeUsername..];
+            let p = PathBuf::from(url_path);
+            log::trace!("url={}, parsed_path={:?}", url, p);
+            p
+        } else {
+            path.to_path_buf()
+        };
+        self.dispatch_path(&parsed_path, &mode)
     }
 
     pub fn handle_pipe(&self, mode: RsopMode) -> anyhow::Result<()> {
