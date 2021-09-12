@@ -54,8 +54,11 @@ pub struct HandlerMapping {
     default_handler_open: Handler,
 }
 
-// How many bytes to read from pipe to guess MIME type, read a full memory page
-const PIPE_INITIAL_READ_LENGTH: usize = 4096;
+lazy_static::lazy_static! {
+    // How many bytes to read from pipe to guess MIME type, use a full memory page
+    static ref PIPE_INITIAL_READ_LENGTH: usize =
+        nix::unistd::sysconf(nix::unistd::SysconfVar::PAGE_SIZE).expect("Unable to get page size").unwrap() as usize;
+}
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 trait ReadStdin: Read + Send {}
@@ -191,7 +194,11 @@ impl HandlerMapping {
         };
 
         // Read header
-        let mut buffer = [0; PIPE_INITIAL_READ_LENGTH];
+        log::trace!(
+            "Using max header length of {} bytes",
+            *PIPE_INITIAL_READ_LENGTH
+        );
+        let mut buffer: Vec<u8> = vec![0; *PIPE_INITIAL_READ_LENGTH];
         let header_len = reader.read(&mut buffer)?;
         let header = &buffer[0..header_len];
 

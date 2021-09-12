@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Features
 
 - Support file:// url prefix
+- Dynamically compute pipe peek size from system page size
 
 ### Refactor
 
