@@ -233,25 +233,6 @@ impl HandlerMapping {
     fn substitute(s: &str, path: &Path, term_size: &termsize::Size) -> String {
         let mut r = s.to_string();
 
-        lazy_static::lazy_static! {
-            static ref COLUMNS_COMMAND_REGEX: regex::Regex = regex::Regex::new(r"([^%])(%c)").unwrap();
-        }
-        r = COLUMNS_COMMAND_REGEX
-            .replace_all(&r, format!("${{1}}{}", term_size.cols))
-            .to_string();
-        r = r.replace("%%c", "%c");
-
-        lazy_static::lazy_static! {
-            static ref LINES_COMMAND_REGEX: regex::Regex = regex::Regex::new(r"([^%])(%l)").unwrap();
-        }
-        r = LINES_COMMAND_REGEX
-            .replace_all(&r, format!("${{1}}{}", term_size.rows))
-            .to_string();
-        r = r.replace("%%l", "%l");
-
-        lazy_static::lazy_static! {
-            static ref INPUT_COMMAND_REGEX: regex::Regex = regex::Regex::new(r"([^%])(%i)").unwrap();
-        }
         let mut path_arg = path
             .to_str()
             .unwrap_or_else(|| panic!("Invalid path {:?}", path))
@@ -259,10 +240,36 @@ impl HandlerMapping {
         if !path_arg.is_empty() {
             path_arg = shlex::quote(&path_arg).to_string();
         }
-        r = INPUT_COMMAND_REGEX
-            .replace_all(&r, format!("${{1}}{}", path_arg))
-            .to_string();
-        r = r.replace("%%i", "%i");
+
+        const BASE_SUBST_REGEX: &str = "([^%])(%{})";
+        const BASE_SUBST_UNESCAPE_SRC: &str = "%%";
+        const BASE_SUBST_UNESCAPE_DST: &str = "%";
+        let map: [(String, &str, &str, &str); 3] = [
+            (
+                format!("{}", term_size.cols),
+                const_format::str_replace!(BASE_SUBST_REGEX, "{}", "c"),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'c'),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'c'),
+            ),
+            (
+                format!("{}", term_size.rows),
+                const_format::str_replace!(BASE_SUBST_REGEX, "{}", "l"),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'l'),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'l'),
+            ),
+            (
+                path_arg,
+                const_format::str_replace!(BASE_SUBST_REGEX, "{}", "i"),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'i'),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'i'),
+            ),
+        ];
+        for (val, re_str, unescape_src, unescape_dst) in map {
+            let re = regex::Regex::new(re_str).unwrap();
+            r = re.replace_all(&r, format!("${{1}}{}", val)).to_string();
+            r = r.replace(unescape_src, unescape_dst);
+        }
+
         r.trim().to_string()
     }
 

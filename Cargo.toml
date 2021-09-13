@@ -6,6 +6,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 better-panic = "0.2"
+const_format = { version = "0.2", features = ["const_generics"] }
 crossbeam-utils = "0.8"
 lazy_static = "1.4"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
