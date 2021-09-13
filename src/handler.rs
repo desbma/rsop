@@ -22,6 +22,19 @@ enum Processor {
     Handler(Handler),
 }
 
+impl Processor {
+    // Return true if command string contains a given % prefixed pattern
+    fn has_pattern(&self, pattern: char) -> bool {
+        let re_str = format!("([^%])(%{})", pattern);
+        let re = regex::Regex::new(&re_str).unwrap();
+        let command = match self {
+            Processor::Filter(f) => &f.command,
+            Processor::Handler(h) => &h.command,
+        };
+        re.is_match(command)
+    }
+}
+
 #[derive(Debug)]
 struct Handlers {
     extensions: HashMap<String, Rc<Processor>>,
@@ -132,6 +145,21 @@ impl HandlerMapping {
         self.dispatch_pipe(stdin, &mode)
     }
 
+    fn path_mime(path: &Path) -> anyhow::Result<Option<&str>> {
+        // Rather than read socket/pipe, mimic 'file -ib xxx' behavior and return 'inode/yyy' strings
+        let file_type = path.metadata()?.file_type();
+        let mime = if file_type.is_socket() {
+            Some("inode/socket")
+        } else if file_type.is_fifo() {
+            Some("inode/fifo")
+        } else {
+            tree_magic_mini::from_filepath(path)
+        };
+        log::debug!("MIME: {:?}", mime);
+
+        Ok(mime)
+    }
+
     #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> anyhow::Result<()> {
         // Handler candidates
@@ -144,21 +172,18 @@ impl HandlerMapping {
             let extension = path.extension().map(|e| e.to_str()).flatten();
             if let Some(extension) = extension {
                 if let Some(handler) = handlers.extensions.get(extension) {
-                    return self.run_path(handler, path, mode);
+                    let mime = if handler.has_pattern('c') {
+                        // Probe MIME type even if we already found a handler, to substitude in command
+                        Self::path_mime(path)?
+                    } else {
+                        None
+                    };
+                    return self.run_path(handler, path, mode, mime);
                 }
             }
         }
 
-        // Rather than read socket/pipe, mimic 'file -ib xxx' behavior and return 'inode/yyy' strings
-        let file_type = path.metadata()?.file_type();
-        let mime = if file_type.is_socket() {
-            Some("inode/socket")
-        } else if file_type.is_fifo() {
-            Some("inode/fifo")
-        } else {
-            tree_magic_mini::from_filepath(path)
-        };
-        log::debug!("MIME: {:?}", mime);
+        let mime = Self::path_mime(path)?;
         if let RsopMode::Identify = mode {
             println!("{}", mime.unwrap());
             return Ok(());
@@ -166,20 +191,25 @@ impl HandlerMapping {
 
         if let Some(mime) = mime {
             if let Some(handler) = handlers.mimes.get(mime) {
-                return self.run_path(handler, path, mode);
+                return self.run_path(handler, path, mode, Some(mime));
             }
 
             // Try "main" MIME type
             let mime_main = mime.split('/').next();
             if let Some(mime_main) = mime_main {
                 if let Some(handler) = handlers.mimes.get(mime_main) {
-                    return self.run_path(handler, path, mode);
+                    return self.run_path(handler, path, mode, Some(mime));
                 }
             }
         }
 
         // Fallback
-        self.run_path(&Processor::Handler(default_handler.to_owned()), path, mode)
+        self.run_path(
+            &Processor::Handler(default_handler.to_owned()),
+            path,
+            mode,
+            mime,
+        )
     }
 
     #[allow(clippy::wildcard_in_or_patterns)]
@@ -210,14 +240,14 @@ impl HandlerMapping {
         }
 
         if let Some(handler) = handlers.mimes.get(mime) {
-            return self.run_pipe(handler, header, reader, mode);
+            return self.run_pipe(handler, header, reader, Some(mime), mode);
         }
 
         // Try "main" MIME type
         let mime_main = mime.split('/').next();
         if let Some(mime_main) = mime_main {
             if let Some(handler) = handlers.mimes.get(mime_main) {
-                return self.run_pipe(handler, header, reader, mode);
+                return self.run_pipe(handler, header, reader, Some(mime), mode);
             }
         }
 
@@ -226,11 +256,13 @@ impl HandlerMapping {
             &Processor::Handler(default_handler.to_owned()),
             header,
             reader,
+            Some(mime),
             mode,
         )
     }
 
-    fn substitute(s: &str, path: &Path, term_size: &termsize::Size) -> String {
+    // Substitute % prefixed patterns in string
+    fn substitute(s: &str, path: &Path, mime: Option<&str>, term_size: &termsize::Size) -> String {
         let mut r = s.to_string();
 
         let mut path_arg = path
@@ -244,7 +276,7 @@ impl HandlerMapping {
         const BASE_SUBST_REGEX: &str = "([^%])(%{})";
         const BASE_SUBST_UNESCAPE_SRC: &str = "%%";
         const BASE_SUBST_UNESCAPE_DST: &str = "%";
-        let map: [(String, &str, &str, &str); 3] = [
+        let mut subst_params: Vec<(String, &str, &str, &str)> = vec![
             (
                 format!("{}", term_size.cols),
                 const_format::str_replace!(BASE_SUBST_REGEX, "{}", "c"),
@@ -264,7 +296,15 @@ impl HandlerMapping {
                 const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'i'),
             ),
         ];
-        for (val, re_str, unescape_src, unescape_dst) in map {
+        if let Some(mime) = mime {
+            subst_params.push((
+                mime.to_string(),
+                const_format::str_replace!(BASE_SUBST_REGEX, "{}", "m"),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'm'),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'm'),
+            ));
+        }
+        for (val, re_str, unescape_src, unescape_dst) in subst_params {
             let re = regex::Regex::new(re_str).unwrap();
             r = re.replace_all(&r, format!("${{1}}{}", val)).to_string();
             r = r.replace(unescape_src, unescape_dst);
@@ -295,13 +335,19 @@ impl HandlerMapping {
         }
     }
 
-    fn run_path(&self, processor: &Processor, path: &Path, mode: &RsopMode) -> anyhow::Result<()> {
+    fn run_path(
+        &self,
+        processor: &Processor,
+        path: &Path,
+        mode: &RsopMode,
+        mime: Option<&str>,
+    ) -> anyhow::Result<()> {
         let term_size = Self::term_size();
 
         match processor {
-            Processor::Handler(handler) => self.run_path_handler(handler, path, &term_size),
+            Processor::Handler(handler) => self.run_path_handler(handler, path, mime, &term_size),
             Processor::Filter(filter) => {
-                let mut filter_child = self.run_path_filter(filter, path, &term_size)?;
+                let mut filter_child = self.run_path_filter(filter, path, mime, &term_size)?;
                 let r = self.dispatch_pipe(filter_child.stdout.take().unwrap(), mode);
                 filter_child.kill()?;
                 filter_child.wait()?;
@@ -314,9 +360,10 @@ impl HandlerMapping {
         &self,
         filter: &Filter,
         path: &Path,
+        mime: Option<&str>,
         term_size: &termsize::Size,
     ) -> anyhow::Result<Child> {
-        let cmd = Self::substitute(&filter.command, path, term_size);
+        let cmd = Self::substitute(&filter.command, path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -331,9 +378,10 @@ impl HandlerMapping {
         &self,
         handler: &Handler,
         path: &Path,
+        mime: Option<&str>,
         term_size: &termsize::Size,
     ) -> anyhow::Result<()> {
-        let cmd = Self::substitute(&handler.command, path, term_size);
+        let cmd = Self::substitute(&handler.command, path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -353,6 +401,7 @@ impl HandlerMapping {
         processor: &Processor,
         header: &[u8],
         mut stdin: T,
+        mime: Option<&str>,
         mode: &RsopMode,
     ) -> anyhow::Result<()>
     where
@@ -362,10 +411,10 @@ impl HandlerMapping {
 
         match processor {
             Processor::Handler(handler) => {
-                self.run_pipe_handler(handler, header, stdin, &term_size)
+                self.run_pipe_handler(handler, header, stdin, mime, &term_size)
             }
             Processor::Filter(filter) => crossbeam_utils::thread::scope(|scope| {
-                let mut filter_child = self.run_pipe_filter(filter, &term_size)?;
+                let mut filter_child = self.run_pipe_filter(filter, mime, &term_size)?;
                 let mut filter_child_stdin = filter_child.stdin.take().unwrap();
                 let filter_child_stdout = filter_child.stdout.take().unwrap();
                 scope.spawn(move |_| {
@@ -384,6 +433,7 @@ impl HandlerMapping {
     fn run_pipe_filter(
         &self,
         filter: &Filter,
+        mime: Option<&str>,
         term_size: &termsize::Size,
     ) -> anyhow::Result<Child> {
         let path = if let Some(stdin_arg) = &filter.stdin_arg {
@@ -391,7 +441,7 @@ impl HandlerMapping {
         } else {
             PathBuf::from("-")
         };
-        let cmd = Self::substitute(&filter.command, &path, term_size);
+        let cmd = Self::substitute(&filter.command, &path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -407,6 +457,7 @@ impl HandlerMapping {
         handler: &Handler,
         header: &[u8],
         mut stdin: T,
+        mime: Option<&str>,
         term_size: &termsize::Size,
     ) -> anyhow::Result<()>
     where
@@ -417,7 +468,7 @@ impl HandlerMapping {
         } else {
             PathBuf::from("-")
         };
-        let cmd = Self::substitute(&handler.command, &path, term_size);
+        let cmd = Self::substitute(&handler.command, &path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -536,15 +587,15 @@ mod tests {
         let path = Path::new("");
 
         assert_eq!(
-            HandlerMapping::substitute("abc def", &path, &term_size),
+            HandlerMapping::substitute("abc def", &path, None, &term_size),
             "abc def"
         );
         assert_eq!(
-            HandlerMapping::substitute("ab%%c def", &path, &term_size),
+            HandlerMapping::substitute("ab%%c def", &path, None, &term_size),
             "ab%c def"
         );
         assert_eq!(
-            HandlerMapping::substitute("ab%c def", &path, &term_size),
+            HandlerMapping::substitute("ab%c def", &path, None, &term_size),
             "ab85 def"
         );
     }

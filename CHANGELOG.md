@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 - Support file:// url prefix
 - Dynamically compute pipe peek size from system page size
+- Support %m substitution in command for MIME type
 
 ### Refactor
 

@@ -31,6 +31,7 @@ mimes = ["text"]
 #   %c: terminal column count
 #   %i: input path
 #   %l: terminal line count
+#   %m: input MIME type
 # Use '%%' if you need to pass a literal '%' char.
 #
 # - shell

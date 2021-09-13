@@ -141,6 +141,7 @@ mimes = ["application/zstd"]
 #   %c: terminal column count
 #   %i: input path
 #   %l: terminal line count
+#   %m: input MIME type
 # Use '%%' if you need to pass a literal '%' char.
 #
 # - shell
@@ -154,7 +155,7 @@ mimes = ["application/zstd"]
 #
 
 [default_handler_preview]
-command = "hexyl --border none %i | head -n %l"
+command = "echo '🔍 MIME: %m'; hexyl --border none %i | head -n $((%l - 1))"
 shell = true
 stdin_arg = ""
 
