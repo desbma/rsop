@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## _unreleased_
 
+### Configuration
+
+- Add application/x-cpio MIME in advanced config + reformat long lists
+
 ### Documentation
 
 - Use git-cliff to generate changelog
