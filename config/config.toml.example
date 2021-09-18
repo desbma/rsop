@@ -166,7 +166,8 @@ mimes = ["application/zstd"]
 # If true, waits for the handler to exit. Defaults to true.
 #
 # - no_pipe
-# If true, disable piping data to handler's stdin, and use a slower temporary file instead if data is piped to rsop. Defaults to false.
+# If true, disable piping data to handler's stdin, and use a slower temporary file instead if data is piped to rsop.
+# Incompatible with 'wait = false'. Defaults to false.
 #
 # - stdin_arg
 # When previewing or opening data from stdin, with what string to substitute '%i'. Defaults to "-", some programs require "".

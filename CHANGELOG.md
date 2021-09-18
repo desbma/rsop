@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## _unreleased_
 
+### Bug Fixes
+
+- Add config check for handlers with both 'no_pipe = true' and 'wait = false'
+
 ### Configuration
 
 - Add application/x-cpio MIME in advanced config + reformat long lists

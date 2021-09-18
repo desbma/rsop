@@ -100,19 +100,25 @@ impl HandlerMapping {
             let handler_open = cfg.handler_open.get(name).cloned();
             let handler_preview = cfg.handler_preview.get(name).cloned();
             let filter = cfg.filter.get(name).cloned();
-            if handler_open.is_none() && handler_preview.is_none() && filter.is_none() {
-                anyhow::bail!("Filetype {} is not bound to any handler or filter", name);
-            }
-            if (handler_open.is_some() || handler_preview.is_some()) && filter.is_some() {
-                anyhow::bail!(
-                    "Filetype {} can not be bound to both a filter and a handler",
-                    name
-                );
-            }
+            anyhow::ensure!(
+                handler_open.is_some() || handler_preview.is_some() || filter.is_some(),
+                "Filetype {} is not bound to any handler or filter",
+                name
+            );
             if let Some(handler_open) = handler_open {
+                anyhow::ensure!(
+                    !handler_open.no_pipe || handler_open.wait,
+                    "Open handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
+                    handler_open
+                );
                 handlers_open.add(Rc::new(Processor::Handler(handler_open)), filetype);
             }
             if let Some(handler_preview) = handler_preview {
+                anyhow::ensure!(
+                    !handler_preview.no_pipe || handler_preview.wait,
+                    "Preview handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
+                    handler_preview
+                );
                 handlers_preview.add(Rc::new(Processor::Handler(handler_preview)), filetype);
             }
             if let Some(filter) = filter {
@@ -537,7 +543,7 @@ impl HandlerMapping {
             drop(child_stdin);
         }
 
-        if handler.wait {
+        if handler.wait || handler.no_pipe {
             child.wait()?;
         }
 
