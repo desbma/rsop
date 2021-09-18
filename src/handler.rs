@@ -22,6 +22,11 @@ enum Processor {
     Handler(Handler),
 }
 
+enum PipeOrTmpFile<T> {
+    Pipe(T),
+    TmpFile(tempfile::NamedTempFile),
+}
+
 impl Processor {
     // Return true if command string contains a given % prefixed pattern
     fn has_pattern(&self, pattern: char) -> bool {
@@ -74,18 +79,18 @@ lazy_static::lazy_static! {
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
-trait ReadStdin: Read + Send {}
+trait ReadPipe: Read + Send {}
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-trait ReadStdin: Read + AsRawFd + Send {}
+trait ReadPipe: Read + AsRawFd + Send {}
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
-impl ReadStdin for StdinLock<'_> {}
+impl ReadPipe for StdinLock<'_> {}
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-impl ReadStdin for File {}
+impl ReadPipe for File {}
 
-impl ReadStdin for ChildStdout {}
+impl ReadPipe for ChildStdout {}
 
 impl HandlerMapping {
     pub fn new(cfg: &config::Config) -> anyhow::Result<HandlerMapping> {
@@ -213,9 +218,9 @@ impl HandlerMapping {
     }
 
     #[allow(clippy::wildcard_in_or_patterns)]
-    fn dispatch_pipe<T>(&self, mut reader: T, mode: &RsopMode) -> anyhow::Result<()>
+    fn dispatch_pipe<T>(&self, mut pipe: T, mode: &RsopMode) -> anyhow::Result<()>
     where
-        T: ReadStdin,
+        T: ReadPipe,
     {
         // Handler candidates
         let (handlers, default_handler) = match mode {
@@ -229,7 +234,7 @@ impl HandlerMapping {
             *PIPE_INITIAL_READ_LENGTH
         );
         let mut buffer: Vec<u8> = vec![0; *PIPE_INITIAL_READ_LENGTH];
-        let header_len = reader.read(&mut buffer)?;
+        let header_len = pipe.read(&mut buffer)?;
         let header = &buffer[0..header_len];
 
         let mime = tree_magic_mini::from_u8(header);
@@ -240,14 +245,14 @@ impl HandlerMapping {
         }
 
         if let Some(handler) = handlers.mimes.get(mime) {
-            return self.run_pipe(handler, header, reader, Some(mime), mode);
+            return self.run_pipe(handler, header, pipe, Some(mime), mode);
         }
 
         // Try "main" MIME type
         let mime_main = mime.split('/').next();
         if let Some(mime_main) = mime_main {
             if let Some(handler) = handlers.mimes.get(mime_main) {
-                return self.run_pipe(handler, header, reader, Some(mime), mode);
+                return self.run_pipe(handler, header, pipe, Some(mime), mode);
             }
         }
 
@@ -255,7 +260,7 @@ impl HandlerMapping {
         self.run_pipe(
             &Processor::Handler(default_handler.to_owned()),
             header,
-            reader,
+            pipe,
             Some(mime),
             mode,
         )
@@ -400,30 +405,52 @@ impl HandlerMapping {
         &self,
         processor: &Processor,
         header: &[u8],
-        mut stdin: T,
+        pipe: T,
         mime: Option<&str>,
         mode: &RsopMode,
     ) -> anyhow::Result<()>
     where
-        T: ReadStdin,
+        T: ReadPipe,
     {
         let term_size = Self::term_size();
 
         match processor {
             Processor::Handler(handler) => {
-                self.run_pipe_handler(handler, header, stdin, mime, &term_size)
+                self.run_pipe_handler(handler, header, pipe, mime, &term_size)
             }
             Processor::Filter(filter) => crossbeam_utils::thread::scope(|scope| {
-                let mut filter_child = self.run_pipe_filter(filter, mime, &term_size)?;
-                let mut filter_child_stdin = filter_child.stdin.take().unwrap();
+                // Write to a temporary file if filter does not support reading from stdin
+                let input = if filter.no_pipe {
+                    PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+                } else {
+                    PipeOrTmpFile::Pipe(pipe)
+                };
+
+                // Run
+                let tmp_file = if let PipeOrTmpFile::TmpFile(ref tmp_file) = input {
+                    Some(tmp_file)
+                } else {
+                    None
+                };
+                let mut filter_child = self.run_pipe_filter(filter, mime, tmp_file, &term_size)?;
                 let filter_child_stdout = filter_child.stdout.take().unwrap();
-                scope.spawn(move |_| {
-                    Self::pipe_forward(&mut stdin, &mut filter_child_stdin, header)
-                        .expect("Pipe forward failed in thread")
-                });
+
+                if let PipeOrTmpFile::Pipe(mut pipe) = input {
+                    // Send data to filter
+                    let mut filter_child_stdin = filter_child.stdin.take().unwrap();
+                    scope.spawn(move |_| {
+                        Self::pipe_forward(&mut pipe, &mut filter_child_stdin, header)
+                            .expect("Pipe forward failed in thread")
+                    });
+                }
+
+                // Dispatch to next handler/filter
                 let r = self.dispatch_pipe(filter_child_stdout, mode);
+
+                // Cleanup
                 filter_child.kill()?;
                 filter_child.wait()?;
+
                 r
             })
             .unwrap(),
@@ -434,9 +461,13 @@ impl HandlerMapping {
         &self,
         filter: &Filter,
         mime: Option<&str>,
+        tmp_file: Option<&tempfile::NamedTempFile>,
         term_size: &termsize::Size,
     ) -> anyhow::Result<Child> {
-        let path = if let Some(stdin_arg) = &filter.stdin_arg {
+        // Build command
+        let path = if let Some(tmp_file) = tmp_file {
+            tmp_file.path().to_path_buf()
+        } else if let Some(stdin_arg) = &filter.stdin_arg {
             PathBuf::from(stdin_arg)
         } else {
             PathBuf::from("-")
@@ -444,11 +475,15 @@ impl HandlerMapping {
         let cmd = Self::substitute(&filter.command, &path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
 
+        // Run
         let mut command = Command::new(&cmd_args[0]);
-        command
-            .args(&cmd_args[1..])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped());
+        command.args(&cmd_args[1..]);
+        if tmp_file.is_none() {
+            command.stdin(Stdio::piped());
+        } else {
+            command.stdin(Stdio::null());
+        }
+        command.stdout(Stdio::piped());
         Ok(command.spawn()?)
     }
 
@@ -456,14 +491,24 @@ impl HandlerMapping {
         &self,
         handler: &Handler,
         header: &[u8],
-        mut stdin: T,
+        pipe: T,
         mime: Option<&str>,
         term_size: &termsize::Size,
     ) -> anyhow::Result<()>
     where
-        T: ReadStdin,
+        T: ReadPipe,
     {
-        let path = if let Some(stdin_arg) = &handler.stdin_arg {
+        // Write to a temporary file if handler does not support reading from stdin
+        let input = if handler.no_pipe {
+            PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+        } else {
+            PipeOrTmpFile::Pipe(pipe)
+        };
+
+        // Build command
+        let path = if let PipeOrTmpFile::TmpFile(ref tmp_file) = input {
+            tmp_file.path().to_path_buf()
+        } else if let Some(stdin_arg) = &handler.stdin_arg {
             PathBuf::from(stdin_arg)
         } else {
             PathBuf::from("-")
@@ -471,17 +516,26 @@ impl HandlerMapping {
         let cmd = Self::substitute(&handler.command, &path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
+        // Run
         let mut command = Command::new(&cmd_args[0]);
-        command.args(&cmd_args[1..]).stdin(Stdio::piped());
+        command.args(&cmd_args[1..]);
+        if let PipeOrTmpFile::Pipe(_) = input {
+            command.stdin(Stdio::piped());
+        } else {
+            command.stdin(Stdio::null());
+        }
         if !handler.wait {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
         let mut child = command.spawn()?;
 
-        let mut child_stdin = child.stdin.take().unwrap();
-        Self::pipe_forward(&mut stdin, &mut child_stdin, header)?;
-        drop(child_stdin);
+        if let PipeOrTmpFile::Pipe(mut pipe) = input {
+            // Send data to handler
+            let mut child_stdin = child.stdin.take().unwrap();
+            Self::pipe_forward(&mut pipe, &mut child_stdin, header)?;
+            drop(child_stdin);
+        }
 
         if handler.wait {
             child.wait()?;
@@ -508,7 +562,7 @@ impl HandlerMapping {
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    // Default chunk copy using stdlib's std::io::cpy when splice syscall is not available
+    // Default chunk copy using stdlib's std::io::copy when splice syscall is not available
     fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<u64>
     where
         S: Read,
@@ -537,7 +591,7 @@ impl HandlerMapping {
         log::trace!("Header written ({} bytes)", header.len());
 
         let mut c = 0;
-        const SPLICE_LEN: usize = usize::MAX;
+        const SPLICE_LEN: usize = 2usize.pow(62); // splice returns -EINVAL for pipe to file with usize::MAX len
         const SPLICE_FLAGS: nix::fcntl::SpliceFFlags = nix::fcntl::SpliceFFlags::empty();
 
         loop {
@@ -564,6 +618,20 @@ impl HandlerMapping {
         log::trace!("Pipe exhausted, moved {} bytes total", header.len() + c);
 
         Ok(header.len() + c)
+    }
+
+    fn pipe_to_tmpfile<T>(header: &[u8], mut pipe: T) -> anyhow::Result<tempfile::NamedTempFile>
+    where
+        T: ReadPipe,
+    {
+        let mut tmp_file = tempfile::Builder::new()
+            .prefix(const_format::concatcp!(env!("CARGO_PKG_NAME"), '_'))
+            .tempfile()?;
+        log::debug!("Writing to temporary file {:?}", tmp_file.path());
+        let file = tmp_file.as_file_mut();
+        Self::pipe_forward(&mut pipe, file, header)?;
+        file.flush()?;
+        Ok(tmp_file)
     }
 
     fn build_cmd(cmd: &str, shell: bool) -> anyhow::Result<Vec<String>> {

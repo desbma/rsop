@@ -18,6 +18,8 @@ pub struct Handler {
     pub wait: bool,
     #[serde(default)]
     pub shell: bool,
+    #[serde(default)]
+    pub no_pipe: bool,
     pub stdin_arg: Option<String>,
 }
 
@@ -30,6 +32,8 @@ pub struct Filter {
     pub command: String,
     #[serde(default)]
     pub shell: bool,
+    #[serde(default)]
+    pub no_pipe: bool,
     pub stdin_arg: Option<String>,
 }
 

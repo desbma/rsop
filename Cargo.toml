@@ -17,6 +17,7 @@ simple_logger = { version = "1.3", default-features = false }
 structopt = "0.3"
 strum = "0.21"
 strum_macros = "0.21"
+tempfile = "3.2"
 termsize = "0.1"
 toml = "0.5"
 tree_magic_mini = "3.0"

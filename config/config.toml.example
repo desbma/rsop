@@ -150,6 +150,9 @@ mimes = ["application/zstd"]
 # - wait
 # If true, waits for the handler to exit. Defaults to true.
 #
+# - no_pipe
+# If true, disable piping data to handler's stdin, and use a slower temporary file instead if data is piped to rsop. Defaults to false.
+#
 # - stdin_arg
 # When previewing or opening data from stdin, with what string to substitute '%i'. Defaults to "-", some programs require "".
 #
@@ -271,6 +274,7 @@ command = "ss -alxp src unix:'%i'"
 [handler_preview.sqlite]
 command = "sqlite3 %i .dump | bat -P --color=always -n --terminal-width %c -r :%l -l sql"
 shell = true
+no_pipe = true
 
 [handler_preview.text]
 command = "bat -P --color=always -n --terminal-width %c -r :%l %i"

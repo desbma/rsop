@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Support file:// url prefix
 - Dynamically compute pipe peek size from system page size
 - Support %m substitution in command for MIME type
+- Add no_pipe option to use temp file if handler does not support reading from stdin
 
 ### Refactor
 
