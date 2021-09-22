@@ -224,7 +224,7 @@ command = "w3m -dump %i"
 
 [handler_open.html]
 command = "firefox %i"
-wait = false
+no_pipe = true
 
 [handler_preview.image]
 command = "chafa -s %cx%l %i"
@@ -236,7 +236,7 @@ stdin_arg = "-"
 
 [handler_open.guitar_tab]
 command = "tuxguitar %i"
-wait = false
+no_pipe = true
 
 [handler_preview.markdown]
 command = "mdcat %i"
@@ -244,6 +244,7 @@ command = "mdcat %i"
 [handler_open.markdown]
 command = "retext %i"
 wait = false
+stdin_arg = "-"
 
 [handler_preview.msdocument]
 command = "pandoc -s -t markdown -- %i | mdcat"
@@ -251,14 +252,14 @@ shell = true
 
 [handler_open.msdocument]
 command = "libreoffice %i"
-wait = false
+no_pipe = true
 
 [handler_preview.opendocument]
 command = "odt2txt %i"
 
 [handler_open.opendocument]
 command = "libreoffice %i"
-wait = false
+no_pipe = true
 
 [handler_preview.patch]
 command = "cat %i | delta"
@@ -304,6 +305,7 @@ command = "transmission-show -- %i"
 [handler_preview.video]
 command = "ffmpegthumbnailer -s 800 -c jpg -q 6 -i %i -o - 2> /dev/null | chafa -s %cx%l -"
 shell = true
+stdin_arg = "-"
 
 [handler_open.video]
 command = "mpv %i"
