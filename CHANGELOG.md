@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Fix some handlers in advanced config when piped
 - Add application/x-archive MIME in advanced config
 - Fix some more handlers in advanced config when piped
+- Add openscad preview in advanced config
 
 ### Documentation
 

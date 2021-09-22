@@ -282,6 +282,11 @@ shell = true
 command = "atril %i"
 wait = false
 
+[handler_preview.scad]
+command = "openscad -q --render --colorscheme=Solarized --imgsize=800,600 --export-format png -o - %i | chafa -s %cx%l -"
+shell = true
+no_pipe = true
+
 [handler_open.scad]
 command = "openscad %i"
 wait = false
