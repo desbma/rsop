@@ -285,6 +285,7 @@ wait = false
 [handler_open.scad]
 command = "openscad %i"
 wait = false
+no_pipe = true
 
 [handler_preview.socket]
 command = "ss -alxp src unix:'%i'"
@@ -299,6 +300,7 @@ command = "bat -P --color=always -n --terminal-width %c -r :%l %i"
 
 [handler_open.text]
 command = "subl %i"
+stdin_arg = "-"
 
 [handler_preview.torrent]
 command = "transmission-show -- %i"
