@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Add config check for handlers with both 'no_pipe = true' and 'wait = false'
+- Incompatible flags in advanced config
 
 ### Configuration
 

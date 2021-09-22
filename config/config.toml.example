@@ -289,7 +289,6 @@ no_pipe = true
 
 [handler_open.scad]
 command = "openscad %i"
-wait = false
 no_pipe = true
 
 [handler_preview.socket]
