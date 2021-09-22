@@ -272,7 +272,7 @@ shell = true
 
 [handler_open.pcap]
 command = "wireshark %i"
-wait = false
+no_pipe = true
 
 [handler_preview.pdf]
 command = "t=$(mktemp); pdftoppm -f 1 -l 1 -scale-to-x 800 -scale-to-y -1 -singlefile -jpeg -jpegopt quality=60 -tiffcompression jpeg -- %i \"${t}\" && chafa -s %cx%l \"${t}.jpg\"; rm \"${t}.jpg\""
