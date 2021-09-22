@@ -56,6 +56,7 @@ mimes = [
     "application/java-archive",
     "application/vnd.rar",
     "application/x-7z-compressed",
+    "application/x-archive",
     "application/x-cpio",
     "application/x-rar",
     "application/x-tar",

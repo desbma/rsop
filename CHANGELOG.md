@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 - Add application/x-cpio MIME in advanced config + reformat long lists
 - Fix some handlers in advanced config when piped
+- Add application/x-archive MIME in advanced config
 
 ### Documentation
 
