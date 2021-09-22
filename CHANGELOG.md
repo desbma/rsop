@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Fix some more handlers in advanced config when piped
 - Add openscad preview in advanced config
 - Fix one more handler in advanced config when piped
+- Fix remaining handlers in advanced config when piped + remove redundant flags
 
 ### Documentation
 

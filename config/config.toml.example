@@ -222,6 +222,7 @@ shell = true
 
 [handler_preview.html]
 command = "w3m -dump %i"
+no_pipe = true
 
 [handler_open.html]
 command = "firefox %i"
@@ -233,7 +234,6 @@ command = "chafa -s %cx%l %i"
 [handler_open.image]
 command = "imv %i"
 wait = false
-stdin_arg = "-"
 
 [handler_open.guitar_tab]
 command = "tuxguitar %i"
@@ -245,7 +245,6 @@ command = "mdcat %i"
 [handler_open.markdown]
 command = "retext %i"
 wait = false
-stdin_arg = "-"
 
 [handler_preview.msdocument]
 command = "pandoc -s -t markdown -- %i | mdcat"
@@ -257,6 +256,7 @@ no_pipe = true
 
 [handler_preview.opendocument]
 command = "odt2txt %i"
+no_pipe = true
 
 [handler_open.opendocument]
 command = "libreoffice %i"
@@ -280,7 +280,7 @@ shell = true
 
 [handler_open.pdf]
 command = "atril %i"
-wait = false
+no_pipe = true
 
 [handler_preview.scad]
 command = "openscad -q --render --colorscheme=Solarized --imgsize=800,600 --export-format png -o - %i | chafa -s %cx%l -"
@@ -304,15 +304,14 @@ command = "bat -P --color=always -n --terminal-width %c -r :%l %i"
 
 [handler_open.text]
 command = "subl %i"
-stdin_arg = "-"
 
 [handler_preview.torrent]
 command = "transmission-show -- %i"
+no_pipe = true
 
 [handler_preview.video]
 command = "ffmpegthumbnailer -s 800 -c jpg -q 6 -i %i -o - 2> /dev/null | chafa -s %cx%l -"
 shell = true
-stdin_arg = "-"
 
 [handler_open.video]
 command = "mpv %i"
