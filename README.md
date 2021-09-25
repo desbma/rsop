@@ -52,7 +52,7 @@ When first started, `rsop` will create a minimal configuration file usually in `
 
 See comments and example in that file to set up file types and handlers for your needs.
 
-A more advanced example configuration file is also available [here](./config/config.toml.example).
+A more advanced example configuration file is also available [here](./config/config.toml.advanced).
 
 ### Usage with ranger
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Filetype {
@@ -11,7 +12,7 @@ pub struct Filetype {
     pub mimes: Vec<String>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize)]
 pub struct Handler {
     pub command: String,
     #[serde(default = "default_handler_wait")]
@@ -51,6 +52,10 @@ pub struct Config {
 }
 
 pub fn parse_config() -> anyhow::Result<Config> {
+    parse_config_path(&get_config_path()?)
+}
+
+fn get_config_path() -> anyhow::Result<PathBuf> {
     const CONFIG_FILENAME: &str = "config.toml";
     const DEFAULT_CONFIG_STR: &str = include_str!("../config/config.toml.default");
     let binary_name = env!("CARGO_PKG_NAME");
@@ -68,11 +73,97 @@ pub fn parse_config() -> anyhow::Result<Config> {
 
     log::debug!("Config filepath: {:?}", config_filepath);
 
-    let toml_data = std::fs::read_to_string(config_filepath)?;
+    Ok(config_filepath)
+}
+
+fn parse_config_path(path: &Path) -> anyhow::Result<Config> {
+    let toml_data = std::fs::read_to_string(path)?;
     log::trace!("Config data: {:?}", toml_data);
 
     let config = toml::from_str(&toml_data)?;
     log::trace!("Config: {:?}", config);
 
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        const DEFAULT_CONFIG_STR: &str = include_str!("../config/config.toml.default");
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file
+            .write_all(&DEFAULT_CONFIG_STR.as_bytes())
+            .unwrap();
+
+        let res = parse_config_path(config_file.path());
+        assert!(res.is_ok());
+        let config = res.unwrap();
+
+        assert_eq!(config.filetype.len(), 2);
+        assert_eq!(config.handler_preview.len(), 1);
+        assert_eq!(
+            config.default_handler_preview,
+            Handler {
+                command: "file %i".to_string(),
+                wait: true,
+                shell: false,
+                no_pipe: false,
+                stdin_arg: None
+            }
+        );
+        assert_eq!(config.handler_open.len(), 1);
+        assert_eq!(
+            config.default_handler_open,
+            Handler {
+                command: "cat -A %i".to_string(),
+                wait: true,
+                shell: false,
+                no_pipe: false,
+                stdin_arg: None
+            }
+        );
+        assert_eq!(config.filter.len(), 1);
+    }
+
+    #[test]
+    fn test_advanced_config() {
+        const ADVANCED_CONFIG_STR: &str = include_str!("../config/config.toml.advanced");
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file
+            .write_all(&ADVANCED_CONFIG_STR.as_bytes())
+            .unwrap();
+
+        let res = parse_config_path(config_file.path());
+        assert!(res.is_ok());
+        let config = res.unwrap();
+
+        assert_eq!(config.filetype.len(), 25);
+        assert_eq!(config.handler_preview.len(), 20);
+        assert_eq!(
+            config.default_handler_preview,
+            Handler {
+                command: "echo '🔍 MIME: %m'; hexyl --border none %i | head -n $((%l - 1))"
+                    .to_string(),
+                wait: true,
+                shell: true,
+                no_pipe: false,
+                stdin_arg: Some("".to_string())
+            }
+        );
+        assert_eq!(config.handler_open.len(), 14);
+        assert_eq!(
+            config.default_handler_open,
+            Handler {
+                command: "hexyl %i | less -R".to_string(),
+                wait: true,
+                shell: true,
+                no_pipe: false,
+                stdin_arg: Some("".to_string())
+            }
+        );
+        assert_eq!(config.filter.len(), 4);
+    }
 }
