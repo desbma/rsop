@@ -1,0 +1,10 @@
+#
+# This is a the smallest config accepted by rsop.
+# Only useful for automated tests.
+#
+
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat -A %i"

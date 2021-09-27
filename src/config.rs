@@ -58,6 +58,7 @@ pub struct Config {
     pub handler_open: HashMap<String, FileHandler>,
     pub default_handler_open: FileHandler,
 
+    #[serde(default)]
     pub filter: HashMap<String, FileFilter>,
 
     #[serde(default)]
@@ -102,6 +103,42 @@ fn parse_config_path(path: &Path) -> anyhow::Result<Config> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_tiny_config() {
+        const TINY_CONFIG_STR: &str = include_str!("../config/config.toml.tiny");
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(&TINY_CONFIG_STR.as_bytes()).unwrap();
+
+        let res = parse_config_path(config_file.path());
+        assert!(res.is_ok());
+        let config = res.unwrap();
+
+        assert_eq!(config.filetype.len(), 0);
+        assert_eq!(config.handler_preview.len(), 0);
+        assert_eq!(
+            config.default_handler_preview,
+            FileHandler {
+                command: "file %i".to_string(),
+                wait: true,
+                shell: false,
+                no_pipe: false,
+                stdin_arg: None
+            }
+        );
+        assert_eq!(config.handler_open.len(), 0);
+        assert_eq!(
+            config.default_handler_open,
+            FileHandler {
+                command: "cat -A %i".to_string(),
+                wait: true,
+                shell: false,
+                no_pipe: false,
+                stdin_arg: None
+            }
+        );
+        assert_eq!(config.filter.len(), 0);
+    }
 
     #[test]
     fn test_default_config() {
