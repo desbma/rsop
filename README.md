@@ -9,8 +9,6 @@ Ideal for use with terminal file managers (ranger, lf, nnn, etc.). Can also be u
 
 If you spend most time in a terminal, and are unsatisfied by current solutions to associate file types with handler programs, this tool may be for you.
 
-**This tool is a work in progress, not ready to be used yet.**
-
 ## Features
 
 - Start program to view/edit file according to extension or MIME type

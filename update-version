@@ -13,8 +13,11 @@ git add Cargo.toml
 cargo update
 git add Cargo.lock
 
+git commit -m "chore: version ${VERSION}"
+git tag -m "Version ${VERSION}" "${VERSION}"
+
 git cliff 1.0.0..HEAD > CHANGELOG.md
 git add CHANGELOG.md
+git commit --amend --no-edit
 
-git commit -m "Version ${VERSION}"
-git tag -m "Version ${VERSION}" "${VERSION}"
+git tag -f -m "Version ${VERSION}" "${VERSION}"

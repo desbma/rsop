@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## _unreleased_
+## 1.1.0 - 2021-09-27
 
 ### Bug Fixes
 
@@ -30,6 +30,10 @@ All notable changes to this project will be documented in this file.
 - Support %m substitution in command for MIME type
 - Add no_pipe option to use temp file if handler does not support reading from stdin
 - URL handlers for xdg-open compatibility
+
+### Miscellaneous Tasks
+
+- Version 1.1.0
 
 ### Refactor
 
