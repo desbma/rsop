@@ -13,13 +13,13 @@ use std::process::{Child, ChildStdout, Command, Stdio};
 use std::rc::Rc;
 
 use crate::config;
-use crate::config::{Filter, Handler};
+use crate::config::{FileFilter, FileHandler, SchemeHandler};
 use crate::RsopMode;
 
 #[derive(Debug)]
-enum Processor {
-    Filter(Filter),
-    Handler(Handler),
+enum FileProcessor {
+    Filter(FileFilter),
+    Handler(FileHandler),
 }
 
 enum PipeOrTmpFile<T> {
@@ -27,34 +27,36 @@ enum PipeOrTmpFile<T> {
     TmpFile(tempfile::NamedTempFile),
 }
 
-impl Processor {
+impl FileProcessor {
     // Return true if command string contains a given % prefixed pattern
     fn has_pattern(&self, pattern: char) -> bool {
         let re_str = format!("([^%])(%{})", pattern);
         let re = regex::Regex::new(&re_str).unwrap();
         let command = match self {
-            Processor::Filter(f) => &f.command,
-            Processor::Handler(h) => &h.command,
+            FileProcessor::Filter(f) => &f.command,
+            FileProcessor::Handler(h) => &h.command,
         };
         re.is_match(command)
     }
 }
 
 #[derive(Debug)]
-struct Handlers {
-    extensions: HashMap<String, Rc<Processor>>,
-    mimes: HashMap<String, Rc<Processor>>,
+struct FileHandlers {
+    extensions: HashMap<String, Rc<FileProcessor>>,
+    mimes: HashMap<String, Rc<FileProcessor>>,
+    default: FileHandler,
 }
 
-impl Handlers {
-    pub fn new() -> Handlers {
-        Handlers {
+impl FileHandlers {
+    pub fn new(default: &FileHandler) -> FileHandlers {
+        FileHandlers {
             extensions: HashMap::new(),
             mimes: HashMap::new(),
+            default: default.clone(),
         }
     }
 
-    pub fn add(&mut self, processor: Rc<Processor>, filetype: &config::Filetype) {
+    pub fn add(&mut self, processor: Rc<FileProcessor>, filetype: &config::Filetype) {
         for extension in &filetype.extensions {
             self.extensions.insert(extension.clone(), processor.clone());
         }
@@ -65,11 +67,27 @@ impl Handlers {
 }
 
 #[derive(Debug)]
+struct SchemeHandlers {
+    schemes: HashMap<String, SchemeHandler>,
+}
+
+impl SchemeHandlers {
+    pub fn new() -> SchemeHandlers {
+        SchemeHandlers {
+            schemes: HashMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, handler: &SchemeHandler, scheme: &str) {
+        self.schemes.insert(scheme.to_owned(), handler.clone());
+    }
+}
+
+#[derive(Debug)]
 pub struct HandlerMapping {
-    handlers_preview: Handlers,
-    default_handler_preview: Handler,
-    handlers_open: Handlers,
-    default_handler_open: Handler,
+    handlers_preview: FileHandlers,
+    handlers_open: FileHandlers,
+    handlers_scheme: SchemeHandlers,
 }
 
 lazy_static::lazy_static! {
@@ -94,8 +112,8 @@ impl ReadPipe for ChildStdout {}
 
 impl HandlerMapping {
     pub fn new(cfg: &config::Config) -> anyhow::Result<HandlerMapping> {
-        let mut handlers_open = Handlers::new();
-        let mut handlers_preview = Handlers::new();
+        let mut handlers_open = FileHandlers::new(&cfg.default_handler_open);
+        let mut handlers_preview = FileHandlers::new(&cfg.default_handler_preview);
         for (name, filetype) in &cfg.filetype {
             let handler_open = cfg.handler_open.get(name).cloned();
             let handler_preview = cfg.handler_preview.get(name).cloned();
@@ -111,7 +129,7 @@ impl HandlerMapping {
                     "Open handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
                     handler_open
                 );
-                handlers_open.add(Rc::new(Processor::Handler(handler_open)), filetype);
+                handlers_open.add(Rc::new(FileProcessor::Handler(handler_open)), filetype);
             }
             if let Some(handler_preview) = handler_preview {
                 anyhow::ensure!(
@@ -119,36 +137,46 @@ impl HandlerMapping {
                     "Preview handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
                     handler_preview
                 );
-                handlers_preview.add(Rc::new(Processor::Handler(handler_preview)), filetype);
+                handlers_preview.add(Rc::new(FileProcessor::Handler(handler_preview)), filetype);
             }
             if let Some(filter) = filter {
-                let proc_filter = Rc::new(Processor::Filter(filter));
+                let proc_filter = Rc::new(FileProcessor::Filter(filter));
                 handlers_open.add(proc_filter.clone(), filetype);
                 handlers_preview.add(proc_filter, filetype);
             }
         }
+
+        let mut handlers_scheme = SchemeHandlers::new();
+        for (schemes, handler) in &cfg.handler_scheme {
+            handlers_scheme.add(handler, schemes);
+        }
+
         Ok(HandlerMapping {
-            default_handler_preview: cfg.default_handler_preview.clone(),
             handlers_preview,
-            default_handler_open: cfg.default_handler_open.clone(),
             handlers_open,
+            handlers_scheme,
         })
     }
 
     pub fn handle_path(&self, mode: RsopMode, path: &Path) -> anyhow::Result<()> {
-        let parsed_path = if let Ok(url) = url::Url::parse(
-            path.to_str()
-                .ok_or_else(|| anyhow::anyhow!("Unable to decode path {:?}", path))?,
+        if let (RsopMode::XdgOpen, Ok(url)) = (
+            &mode,
+            url::Url::parse(
+                path.to_str()
+                    .ok_or_else(|| anyhow::anyhow!("Unable to decode path {:?}", path))?,
+            ),
         ) {
-            // TODO handle other schemes
-            let url_path = &url[url::Position::BeforeUsername..];
-            let p = PathBuf::from(url_path);
-            log::trace!("url={}, parsed_path={:?}", url, p);
-            p
+            if url.scheme() == "file" {
+                let url_path = &url[url::Position::BeforeUsername..];
+                let parsed_path = PathBuf::from(url_path);
+                log::trace!("url={}, parsed_path={:?}", url, parsed_path);
+                self.dispatch_path(&parsed_path, &mode)
+            } else {
+                self.dispatch_url(&url)
+            }
         } else {
-            path.to_path_buf()
-        };
-        self.dispatch_path(&parsed_path, &mode)
+            self.dispatch_path(path, &mode)
+        }
     }
 
     pub fn handle_pipe(&self, mode: RsopMode) -> anyhow::Result<()> {
@@ -174,9 +202,9 @@ impl HandlerMapping {
     #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> anyhow::Result<()> {
         // Handler candidates
-        let (handlers, default_handler) = match mode {
-            RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
-            RsopMode::Open | _ => (&self.handlers_open, &self.default_handler_open),
+        let handlers = match mode {
+            RsopMode::Preview => &self.handlers_preview,
+            RsopMode::Open | _ => &self.handlers_open,
         };
 
         if *mode != RsopMode::Identify {
@@ -216,7 +244,7 @@ impl HandlerMapping {
 
         // Fallback
         self.run_path(
-            &Processor::Handler(default_handler.to_owned()),
+            &FileProcessor::Handler(handlers.default.to_owned()),
             path,
             mode,
             mime,
@@ -229,9 +257,9 @@ impl HandlerMapping {
         T: ReadPipe,
     {
         // Handler candidates
-        let (handlers, default_handler) = match mode {
-            RsopMode::Preview => (&self.handlers_preview, &self.default_handler_preview),
-            RsopMode::Open | _ => (&self.handlers_open, &self.default_handler_open),
+        let handlers = match mode {
+            RsopMode::Preview => &self.handlers_preview,
+            RsopMode::Open | _ => &self.handlers_open,
         };
 
         // Read header
@@ -264,12 +292,21 @@ impl HandlerMapping {
 
         // Fallback
         self.run_pipe(
-            &Processor::Handler(default_handler.to_owned()),
+            &FileProcessor::Handler(handlers.default.to_owned()),
             header,
             pipe,
             Some(mime),
             mode,
         )
+    }
+
+    fn dispatch_url(&self, url: &url::Url) -> anyhow::Result<()> {
+        let scheme = url.scheme();
+        if let Some(handler) = self.handlers_scheme.schemes.get(scheme) {
+            return self.run_url(handler, url);
+        }
+
+        anyhow::bail!("No handler for scheme {:?}", scheme);
     }
 
     // Substitute % prefixed patterns in string
@@ -348,7 +385,7 @@ impl HandlerMapping {
 
     fn run_path(
         &self,
-        processor: &Processor,
+        processor: &FileProcessor,
         path: &Path,
         mode: &RsopMode,
         mime: Option<&str>,
@@ -356,8 +393,10 @@ impl HandlerMapping {
         let term_size = Self::term_size();
 
         match processor {
-            Processor::Handler(handler) => self.run_path_handler(handler, path, mime, &term_size),
-            Processor::Filter(filter) => {
+            FileProcessor::Handler(handler) => {
+                self.run_path_handler(handler, path, mime, &term_size)
+            }
+            FileProcessor::Filter(filter) => {
                 let mut filter_child = self.run_path_filter(filter, path, mime, &term_size)?;
                 let r = self.dispatch_pipe(filter_child.stdout.take().unwrap(), mode);
                 filter_child.kill()?;
@@ -369,7 +408,7 @@ impl HandlerMapping {
 
     fn run_path_filter(
         &self,
-        filter: &Filter,
+        filter: &FileFilter,
         path: &Path,
         mime: Option<&str>,
         term_size: &termsize::Size,
@@ -387,7 +426,7 @@ impl HandlerMapping {
 
     fn run_path_handler(
         &self,
-        handler: &Handler,
+        handler: &FileHandler,
         path: &Path,
         mime: Option<&str>,
         term_size: &termsize::Size,
@@ -409,7 +448,7 @@ impl HandlerMapping {
 
     fn run_pipe<T>(
         &self,
-        processor: &Processor,
+        processor: &FileProcessor,
         header: &[u8],
         pipe: T,
         mime: Option<&str>,
@@ -421,10 +460,10 @@ impl HandlerMapping {
         let term_size = Self::term_size();
 
         match processor {
-            Processor::Handler(handler) => {
+            FileProcessor::Handler(handler) => {
                 self.run_pipe_handler(handler, header, pipe, mime, &term_size)
             }
-            Processor::Filter(filter) => crossbeam_utils::thread::scope(|scope| {
+            FileProcessor::Filter(filter) => crossbeam_utils::thread::scope(|scope| {
                 // Write to a temporary file if filter does not support reading from stdin
                 let input = if filter.no_pipe {
                     PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
@@ -465,7 +504,7 @@ impl HandlerMapping {
 
     fn run_pipe_filter(
         &self,
-        filter: &Filter,
+        filter: &FileFilter,
         mime: Option<&str>,
         tmp_file: Option<&tempfile::NamedTempFile>,
         term_size: &termsize::Size,
@@ -495,7 +534,7 @@ impl HandlerMapping {
 
     fn run_pipe_handler<T>(
         &self,
-        handler: &Handler,
+        handler: &FileHandler,
         header: &[u8],
         pipe: T,
         mime: Option<&str>,
@@ -546,6 +585,26 @@ impl HandlerMapping {
         if handler.wait || handler.no_pipe {
             child.wait()?;
         }
+
+        Ok(())
+    }
+
+    fn run_url(&self, handler: &SchemeHandler, url: &url::Url) -> anyhow::Result<()> {
+        let term_size = Self::term_size();
+
+        // Build command
+        let path: PathBuf = PathBuf::from(url.to_owned().as_str());
+        let cmd = Self::substitute(&handler.command, &path, None, &term_size);
+        let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
+
+        // Run
+        let mut command = Command::new(&cmd_args[0]);
+        command.args(&cmd_args[1..]);
+        // To mimic xdg-open, close all input/outputs and detach
+        command.stdin(Stdio::null());
+        command.stdout(Stdio::null());
+        command.stderr(Stdio::null());
+        command.spawn()?;
 
         Ok(())
     }

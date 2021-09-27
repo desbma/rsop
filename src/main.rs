@@ -18,10 +18,11 @@ mod handler;
     strum_macros::ToString,
 )]
 #[strum(ascii_case_insensitive)]
-#[strum(serialize_all = "lowercase")]
+#[strum(serialize_all = "kebab-case")]
 pub enum RsopMode {
     Preview,
     Open,
+    XdgOpen,
     Identify,
 }
 
@@ -36,7 +37,7 @@ lazy_static::lazy_static! {
         let mut m = BTreeMap::new();
         m.insert("rsp", RsopMode::Preview);
         m.insert("rso", RsopMode::Open);
-        m.insert("xdg-open", RsopMode::Open);
+        m.insert("xdg-open", RsopMode::XdgOpen);
         m.insert("rsi", RsopMode::Identify);
         m
     };

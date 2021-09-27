@@ -149,7 +149,7 @@ mimes = ["application/zstd"]
 
 
 #
-# Handlers
+# File handlers
 #
 # - command
 # The command to run to open or preview file.
@@ -339,3 +339,17 @@ command = "xz -dc %i"
 
 [filter.zstandard]
 command = "zstd -dc %i"
+
+
+#
+# Scheme handlers
+#
+# Handlers for use in 'xdg-open' mode, with URLs instead of paths. URLs prefixed with 'file://' are handled by file handlers.
+# Configuration is similar to file handlers, but only 'command' and 'shell' parameters are supported.
+#
+
+[handler_scheme.http]
+command = "firefox %i"
+
+[handler_scheme.https]
+command = "firefox %i"

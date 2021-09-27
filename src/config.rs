@@ -13,9 +13,9 @@ pub struct Filetype {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize)]
-pub struct Handler {
+pub struct FileHandler {
     pub command: String,
-    #[serde(default = "default_handler_wait")]
+    #[serde(default = "default_file_handler_wait")]
     pub wait: bool,
     #[serde(default)]
     pub shell: bool,
@@ -24,12 +24,12 @@ pub struct Handler {
     pub stdin_arg: Option<String>,
 }
 
-const fn default_handler_wait() -> bool {
+const fn default_file_handler_wait() -> bool {
     true
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
-pub struct Filter {
+pub struct FileFilter {
     pub command: String,
     #[serde(default)]
     pub shell: bool,
@@ -38,17 +38,30 @@ pub struct Filter {
     pub stdin_arg: Option<String>,
 }
 
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct SchemeHandler {
+    pub command: String,
+    #[serde(default)]
+    pub shell: bool,
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Config {
+    #[serde(default)]
     pub filetype: HashMap<String, Filetype>,
 
-    pub handler_preview: HashMap<String, Handler>,
-    pub default_handler_preview: Handler,
+    #[serde(default)]
+    pub handler_preview: HashMap<String, FileHandler>,
+    pub default_handler_preview: FileHandler,
 
-    pub handler_open: HashMap<String, Handler>,
-    pub default_handler_open: Handler,
+    #[serde(default)]
+    pub handler_open: HashMap<String, FileHandler>,
+    pub default_handler_open: FileHandler,
 
-    pub filter: HashMap<String, Filter>,
+    pub filter: HashMap<String, FileFilter>,
+
+    #[serde(default)]
+    pub handler_scheme: HashMap<String, SchemeHandler>,
 }
 
 pub fn parse_config() -> anyhow::Result<Config> {
@@ -106,7 +119,7 @@ mod tests {
         assert_eq!(config.handler_preview.len(), 1);
         assert_eq!(
             config.default_handler_preview,
-            Handler {
+            FileHandler {
                 command: "file %i".to_string(),
                 wait: true,
                 shell: false,
@@ -117,7 +130,7 @@ mod tests {
         assert_eq!(config.handler_open.len(), 1);
         assert_eq!(
             config.default_handler_open,
-            Handler {
+            FileHandler {
                 command: "cat -A %i".to_string(),
                 wait: true,
                 shell: false,
@@ -144,7 +157,7 @@ mod tests {
         assert_eq!(config.handler_preview.len(), 20);
         assert_eq!(
             config.default_handler_preview,
-            Handler {
+            FileHandler {
                 command: "echo '🔍 MIME: %m'; hexyl --border none %i | head -n $((%l - 1))"
                     .to_string(),
                 wait: true,
@@ -156,7 +169,7 @@ mod tests {
         assert_eq!(config.handler_open.len(), 14);
         assert_eq!(
             config.default_handler_open,
-            Handler {
+            FileHandler {
                 command: "hexyl %i | less -R".to_string(),
                 wait: true,
                 shell: true,
