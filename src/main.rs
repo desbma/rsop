@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::env;
+use std::path::Path;
 use std::str::FromStr;
 
 use structopt::StructOpt;
@@ -51,14 +52,16 @@ fn runtime_mode() -> RsopMode {
             .unwrap_or_else(|_| panic!("Unexpected value for RSOP_MODE: {:?}", env_mode));
     }
 
-    // Get from binary name
-    if let Some(mode) = BIN_NAME_TO_MODE.get(
-        env::args()
-            .next()
-            .unwrap_or_else(|| "".to_string())
-            .as_str(),
-    ) {
-        return mode.to_owned();
+    // Get from binary name (env::current_exe() follows symbolic links, so don't use it)
+    let first_arg = env::args().next().unwrap();
+    let bin_name: Option<&str> = Path::new(&first_arg)
+        .file_name()
+        .map(|f| f.to_str())
+        .unwrap();
+    if let Some(bin_name) = bin_name {
+        if let Some(mode) = BIN_NAME_TO_MODE.get(bin_name) {
+            return mode.to_owned();
+        }
     }
 
     let mut sorted_variants = Vec::from(RsopMode::VARIANTS);
