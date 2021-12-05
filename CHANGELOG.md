@@ -2,11 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## _unreleased_
+## 1.1.1 - 2021-12-05
 
 ### Bug Fixes
 
 - Mode detection with absolute path
+
+### Miscellaneous Tasks
+
+- Version 1.1.1
 
 ## 1.1.0 - 2021-09-27
 
