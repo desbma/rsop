@@ -55,7 +55,7 @@ A more advanced example configuration file is also available [here](./config/con
 
 ### Usage with ranger
 
-**Warning: because ranger is build on Python's old ncurses version, the preview panel only supports 8bit colors (see https://github.com/ranger/ranger/issues/690#issuecomment-255590479), so if the output seems wrong you may need to tweak handlers to generate 8bit colors instead of 24.**
+**Warning: because ranger is built on Python's old ncurses version, the preview panel only supports 8bit colors (see https://github.com/ranger/ranger/issues/690#issuecomment-255590479), so if the output seems wrong you may need to tweak handlers to generate 8bit colors instead of 24.**
 
 In `rifle.conf`:
 
