@@ -1,6 +1,7 @@
 # rsop
 
 [![Build status](https://github.com/desbma/rsop/actions/workflows/ci.yml/badge.svg)](https://github.com/desbma/rsop/actions)
+[![AUR version](https://img.shields.io/aur/version/rsop.svg?style=flat)](https://aur.archlinux.org/packages/rsop/)
 [![License](https://img.shields.io/github/license/desbma/rsop.svg?style=flat)](https://github.com/desbma/rsop/blob/master/LICENSE)
 
 Simple, fast & configurable tool to open and preview files.
@@ -32,6 +33,8 @@ Compared to other `xdg-open` alternatives:
 
 ## Installation
 
+### From source
+
 You need a Rust build environment for example from [rustup](https://rustup.rs/).
 
 ```
@@ -44,6 +47,10 @@ ln -rsv /usr/local/bin/rs{op,i}
 # to replace system xdg-open:
 ln -rsv /usr/local/bin/{rsop,xdg-open}
 ```
+
+### From the AUR
+
+Arch Linux users can install the [rsop AUR package](https://aur.archlinux.org/packages/rsop/).
 
 ## Configuration
 

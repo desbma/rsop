@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## _unreleased_
+
+### Documentation
+
+- Fix README typo
+- Add AUR package link in README
+
 ## 1.1.1 - 2021-12-05
 
 ### Bug Fixes
