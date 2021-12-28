@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 - Fix README typo
 - Add AUR package link in README
 
+### Features
+
+- Improve error display for common errors
+
 ## 1.1.1 - 2021-12-05
 
 ### Bug Fixes

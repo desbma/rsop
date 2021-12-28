@@ -101,9 +101,19 @@ fn main() {
     log::debug!("{:?}", handlers);
 
     // Do the job
-    if let Some(path) = cl_opts.path {
-        handlers.handle_path(mode, &path).unwrap();
+    let res = if let Some(path) = cl_opts.path {
+        handlers.handle_path(mode, &path)
     } else {
-        handlers.handle_pipe(mode).unwrap();
+        handlers.handle_pipe(mode)
+    };
+    if let Err(ref err) = res {
+        match err {
+            handler::HandlerError::Input(_) | handler::HandlerError::Start(_) => {
+                log::error!("{}", err)
+            }
+            _ => {
+                res.unwrap();
+            }
+        }
     }
 }

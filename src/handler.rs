@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::env;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::fs::File;
+use std::io::{self, stdin, Read, Write};
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 use std::io::{copy, StdinLock};
-use std::io::{stdin, Read, Write};
 use std::os::unix::fs::FileTypeExt;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -90,6 +90,18 @@ pub struct HandlerMapping {
     handlers_scheme: SchemeHandlers,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum HandlerError {
+    #[error("Failed to start handler: {0}")]
+    Start(io::Error),
+    #[error("Failed to read input file or data: {0}")]
+    Input(io::Error),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
 lazy_static::lazy_static! {
     // How many bytes to read from pipe to guess MIME type, use a full memory page
     static ref PIPE_INITIAL_READ_LENGTH: usize =
@@ -158,7 +170,7 @@ impl HandlerMapping {
         })
     }
 
-    pub fn handle_path(&self, mode: RsopMode, path: &Path) -> anyhow::Result<()> {
+    pub fn handle_path(&self, mode: RsopMode, path: &Path) -> Result<(), HandlerError> {
         if let (RsopMode::XdgOpen, Ok(url)) = (
             &mode,
             url::Url::parse(
@@ -179,12 +191,12 @@ impl HandlerMapping {
         }
     }
 
-    pub fn handle_pipe(&self, mode: RsopMode) -> anyhow::Result<()> {
+    pub fn handle_pipe(&self, mode: RsopMode) -> Result<(), HandlerError> {
         let stdin = Self::stdin_reader()?;
         self.dispatch_pipe(stdin, &mode)
     }
 
-    fn path_mime(path: &Path) -> anyhow::Result<Option<&str>> {
+    fn path_mime(path: &Path) -> Result<Option<&str>, io::Error> {
         // Rather than read socket/pipe, mimic 'file -ib xxx' behavior and return 'inode/yyy' strings
         let file_type = path.metadata()?.file_type();
         let mime = if file_type.is_socket() {
@@ -200,7 +212,7 @@ impl HandlerMapping {
     }
 
     #[allow(clippy::wildcard_in_or_patterns)]
-    fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> anyhow::Result<()> {
+    fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> Result<(), HandlerError> {
         // Handler candidates
         let handlers = match mode {
             RsopMode::Preview => &self.handlers_preview,
@@ -213,7 +225,7 @@ impl HandlerMapping {
                 if let Some(handler) = handlers.extensions.get(extension) {
                     let mime = if handler.has_pattern('c') {
                         // Probe MIME type even if we already found a handler, to substitude in command
-                        Self::path_mime(path)?
+                        Self::path_mime(path).map_err(HandlerError::Input)?
                     } else {
                         None
                     };
@@ -222,7 +234,7 @@ impl HandlerMapping {
             }
         }
 
-        let mime = Self::path_mime(path)?;
+        let mime = Self::path_mime(path).map_err(HandlerError::Input)?;
         if let RsopMode::Identify = mode {
             println!("{}", mime.unwrap());
             return Ok(());
@@ -252,7 +264,7 @@ impl HandlerMapping {
     }
 
     #[allow(clippy::wildcard_in_or_patterns)]
-    fn dispatch_pipe<T>(&self, mut pipe: T, mode: &RsopMode) -> anyhow::Result<()>
+    fn dispatch_pipe<T>(&self, mut pipe: T, mode: &RsopMode) -> Result<(), HandlerError>
     where
         T: ReadPipe,
     {
@@ -300,13 +312,16 @@ impl HandlerMapping {
         )
     }
 
-    fn dispatch_url(&self, url: &url::Url) -> anyhow::Result<()> {
+    fn dispatch_url(&self, url: &url::Url) -> Result<(), HandlerError> {
         let scheme = url.scheme();
         if let Some(handler) = self.handlers_scheme.schemes.get(scheme) {
             return self.run_url(handler, url);
         }
 
-        anyhow::bail!("No handler for scheme {:?}", scheme);
+        Err(HandlerError::Other(anyhow::anyhow!(
+            "No handler for scheme {:?}",
+            scheme
+        )))
     }
 
     // Substitute % prefixed patterns in string
@@ -389,7 +404,7 @@ impl HandlerMapping {
         path: &Path,
         mode: &RsopMode,
         mime: Option<&str>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), HandlerError> {
         let term_size = Self::term_size();
 
         match processor {
@@ -412,7 +427,7 @@ impl HandlerMapping {
         path: &Path,
         mime: Option<&str>,
         term_size: &termsize::Size,
-    ) -> anyhow::Result<Child> {
+    ) -> Result<Child, HandlerError> {
         let cmd = Self::substitute(&filter.command, path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
 
@@ -420,8 +435,9 @@ impl HandlerMapping {
         command
             .args(&cmd_args[1..])
             .stdin(Stdio::null())
-            .stdout(Stdio::piped());
-        Ok(command.spawn()?)
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(HandlerError::Start)
     }
 
     fn run_path_handler(
@@ -430,20 +446,19 @@ impl HandlerMapping {
         path: &Path,
         mime: Option<&str>,
         term_size: &termsize::Size,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), HandlerError> {
         let cmd = Self::substitute(&handler.command, path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
         command.args(&cmd_args[1..]).stdin(Stdio::null());
         if handler.wait {
-            command.status()?;
+            command.status().map(|_| ()).map_err(HandlerError::Start)
         } else {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
-            command.spawn()?;
+            command.spawn().map(|_| ()).map_err(HandlerError::Start)
         }
-        Ok(())
     }
 
     fn run_pipe<T>(
@@ -453,7 +468,7 @@ impl HandlerMapping {
         pipe: T,
         mime: Option<&str>,
         mode: &RsopMode,
-    ) -> anyhow::Result<()>
+    ) -> Result<(), HandlerError>
     where
         T: ReadPipe,
     {
@@ -508,7 +523,7 @@ impl HandlerMapping {
         mime: Option<&str>,
         tmp_file: Option<&tempfile::NamedTempFile>,
         term_size: &termsize::Size,
-    ) -> anyhow::Result<Child> {
+    ) -> Result<Child, HandlerError> {
         // Build command
         let path = if let Some(tmp_file) = tmp_file {
             tmp_file.path().to_path_buf()
@@ -539,7 +554,7 @@ impl HandlerMapping {
         pipe: T,
         mime: Option<&str>,
         term_size: &termsize::Size,
-    ) -> anyhow::Result<()>
+    ) -> Result<(), HandlerError>
     where
         T: ReadPipe,
     {
@@ -573,7 +588,7 @@ impl HandlerMapping {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
-        let mut child = command.spawn()?;
+        let mut child = command.spawn().map_err(HandlerError::Start)?;
 
         if let PipeOrTmpFile::Pipe(mut pipe) = input {
             // Send data to handler
@@ -589,7 +604,7 @@ impl HandlerMapping {
         Ok(())
     }
 
-    fn run_url(&self, handler: &SchemeHandler, url: &url::Url) -> anyhow::Result<()> {
+    fn run_url(&self, handler: &SchemeHandler, url: &url::Url) -> Result<(), HandlerError> {
         let term_size = Self::term_size();
 
         // Build command
