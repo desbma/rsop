@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## _unreleased_
+## 1.1.2 - 2021-12-29
 
 ### Documentation
 
@@ -12,6 +12,15 @@ All notable changes to this project will be documented in this file.
 ### Features
 
 - Improve error display for common errors
+- Improve error display for common errors, take 2
+
+### Miscellaneous Tasks
+
+- Version 1.1.2
+
+### Refactor
+
+- Remove better-panic
 
 ## 1.1.1 - 2021-12-05
 
