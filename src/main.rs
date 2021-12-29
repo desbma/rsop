@@ -3,6 +3,7 @@ use std::env;
 use std::path::Path;
 use std::str::FromStr;
 
+use anyhow::Context;
 use structopt::StructOpt;
 use strum::VariantNames;
 
@@ -80,11 +81,11 @@ fn runtime_mode() -> RsopMode {
     RsopMode::default()
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     // Init logger
     simple_logger::SimpleLogger::new()
         .init()
-        .expect("Failed to init logger");
+        .context("Failed to init logger")?;
     better_panic::install();
 
     // Parse command line opts
@@ -94,26 +95,18 @@ fn main() {
     log::trace!("{:?}", cl_opts);
 
     // Parse config
-    let cfg = config::parse_config().expect("Failed to read config");
+    let cfg = config::parse_config().context("Failed to read config")?;
 
     // Build mapping for fast searches
-    let handlers = handler::HandlerMapping::new(&cfg).expect("Failed to build handler mapping");
+    let handlers = handler::HandlerMapping::new(&cfg).context("Failed to build handler mapping")?;
     log::debug!("{:?}", handlers);
 
     // Do the job
-    let res = if let Some(path) = cl_opts.path {
-        handlers.handle_path(mode, &path)
+    if let Some(path) = cl_opts.path {
+        handlers.handle_path(mode, &path)?;
     } else {
-        handlers.handle_pipe(mode)
-    };
-    if let Err(ref err) = res {
-        match err {
-            handler::HandlerError::Input(_) | handler::HandlerError::Start(_) => {
-                log::error!("{}", err)
-            }
-            _ => {
-                res.unwrap();
-            }
-        }
+        handlers.handle_pipe(mode)?;
     }
+
+    Ok(())
 }

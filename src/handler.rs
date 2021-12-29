@@ -92,10 +92,10 @@ pub struct HandlerMapping {
 
 #[derive(thiserror::Error, Debug)]
 pub enum HandlerError {
-    #[error("Failed to start handler: {0}")]
-    Start(io::Error),
-    #[error("Failed to read input file or data: {0}")]
-    Input(io::Error),
+    #[error("Failed to run handler command {:?}: {err}", .cmd.connect(" "))]
+    Start { err: io::Error, cmd: Vec<String> },
+    #[error("Failed to read input file {path:?}: {err}")]
+    Input { err: io::Error, path: PathBuf },
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
@@ -225,7 +225,10 @@ impl HandlerMapping {
                 if let Some(handler) = handlers.extensions.get(extension) {
                     let mime = if handler.has_pattern('c') {
                         // Probe MIME type even if we already found a handler, to substitude in command
-                        Self::path_mime(path).map_err(HandlerError::Input)?
+                        Self::path_mime(path).map_err(|e| HandlerError::Input {
+                            err: e,
+                            path: path.to_owned(),
+                        })?
                     } else {
                         None
                     };
@@ -234,7 +237,10 @@ impl HandlerMapping {
             }
         }
 
-        let mime = Self::path_mime(path).map_err(HandlerError::Input)?;
+        let mime = Self::path_mime(path).map_err(|e| HandlerError::Input {
+            err: e,
+            path: path.to_owned(),
+        })?;
         if let RsopMode::Identify = mode {
             println!("{}", mime.unwrap());
             return Ok(());
@@ -437,7 +443,10 @@ impl HandlerMapping {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .spawn()
-            .map_err(HandlerError::Start)
+            .map_err(|e| HandlerError::Start {
+                err: e,
+                cmd: cmd_args.to_owned(),
+            })
     }
 
     fn run_path_handler(
@@ -453,11 +462,23 @@ impl HandlerMapping {
         let mut command = Command::new(&cmd_args[0]);
         command.args(&cmd_args[1..]).stdin(Stdio::null());
         if handler.wait {
-            command.status().map(|_| ()).map_err(HandlerError::Start)
+            command
+                .status()
+                .map(|_| ())
+                .map_err(|e| HandlerError::Start {
+                    err: e,
+                    cmd: cmd_args.to_owned(),
+                })
         } else {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
-            command.spawn().map(|_| ()).map_err(HandlerError::Start)
+            command
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| HandlerError::Start {
+                    err: e,
+                    cmd: cmd_args.to_owned(),
+                })
         }
     }
 
@@ -544,7 +565,11 @@ impl HandlerMapping {
             command.stdin(Stdio::null());
         }
         command.stdout(Stdio::piped());
-        Ok(command.spawn()?)
+        let child = command.spawn().map_err(|e| HandlerError::Start {
+            err: e,
+            cmd: cmd_args.to_owned(),
+        })?;
+        Ok(child)
     }
 
     fn run_pipe_handler<T>(
@@ -588,7 +613,10 @@ impl HandlerMapping {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
-        let mut child = command.spawn().map_err(HandlerError::Start)?;
+        let mut child = command.spawn().map_err(|e| HandlerError::Start {
+            err: e,
+            cmd: cmd_args.to_owned(),
+        })?;
 
         if let PipeOrTmpFile::Pipe(mut pipe) = input {
             // Send data to handler
@@ -619,7 +647,10 @@ impl HandlerMapping {
         command.stdin(Stdio::null());
         command.stdout(Stdio::null());
         command.stderr(Stdio::null());
-        command.spawn()?;
+        command.spawn().map_err(|e| HandlerError::Start {
+            err: e,
+            cmd: cmd_args.to_owned(),
+        })?;
 
         Ok(())
     }
