@@ -5,7 +5,6 @@ edition = "2018"
 
 [dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
-better-panic = "0.2"
 const_format = { version = "0.2", features = ["const_generics"] }
 crossbeam-utils = "0.8"
 lazy_static = "1.4"

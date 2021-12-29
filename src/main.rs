@@ -86,7 +86,6 @@ fn main() -> anyhow::Result<()> {
     simple_logger::SimpleLogger::new()
         .init()
         .context("Failed to init logger")?;
-    better_panic::install();
 
     // Parse command line opts
     let mode = runtime_mode();
