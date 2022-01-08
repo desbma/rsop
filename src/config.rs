@@ -94,7 +94,15 @@ fn parse_config_path(path: &Path) -> anyhow::Result<Config> {
     let toml_data = std::fs::read_to_string(path)?;
     log::trace!("Config data: {:?}", toml_data);
 
-    let config = toml::from_str(&toml_data)?;
+    let mut config: Config = toml::from_str(&toml_data)?;
+    // Normalize extensions to lower case
+    for filetype in config.filetype.values_mut() {
+        filetype.extensions = filetype
+            .extensions
+            .iter()
+            .map(|e| e.to_lowercase())
+            .collect();
+    }
     log::trace!("Config: {:?}", config);
 
     Ok(config)

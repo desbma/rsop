@@ -221,7 +221,6 @@ impl HandlerMapping {
 
         if *mode != RsopMode::Identify {
             for extension in Self::path_extensions(path)? {
-                // TODO lowercase here and in config parsing
                 if let Some(handler) = handlers.extensions.get(&extension) {
                     let mime = if handler.has_pattern('c') {
                         // Probe MIME type even if we already found a handler, to substitude in command
@@ -776,7 +775,7 @@ impl HandlerMapping {
                 .rev()
                 .collect();
             if double_ext_parts.len() == 2 {
-                extensions.push(double_ext_parts.join("."));
+                extensions.push(double_ext_parts.join(".").to_lowercase());
             }
             extensions.push(
                 extension
@@ -784,7 +783,7 @@ impl HandlerMapping {
                     .ok_or_else(|| {
                         anyhow::anyhow!("Unable to decode extension for path {:?}", path)
                     })?
-                    .to_string(),
+                    .to_lowercase(),
             );
         }
         Ok(extensions)
@@ -830,6 +829,10 @@ mod tests {
         );
         assert_eq!(
             HandlerMapping::path_extensions(&Path::new("/tmp/foo.bar.baz")).ok(),
+            Some(vec!["bar.baz".to_string(), "baz".to_string()])
+        );
+        assert_eq!(
+            HandlerMapping::path_extensions(&Path::new("/tmp/foo.BaR.bAz")).ok(),
             Some(vec!["bar.baz".to_string(), "baz".to_string()])
         );
         assert_eq!(
