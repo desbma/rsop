@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.0 - 2022-01-08
+
+### Features
+
+- Support matching by double extensions
+- Ensure extension matching is case insensitive
+- Update advanced config
+
+### Miscellaneous Tasks
+
+- Version 1.2.0
+
 ## 1.1.2 - 2021-12-29
 
 ### Documentation
