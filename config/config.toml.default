@@ -8,7 +8,8 @@
 # File types, identified by extension or MIME type
 #
 # - extensions
-# List of extensions, always checked before MIME type.
+# List of extensions, always checked before MIME type. Double extensions (ie. 'tar.gz') are supported, although it usually
+# makes more sense to use a filter instead.
 #
 # - mimes
 # List of MIME types, the main type (part before the '/') can be used to match several subtypes.

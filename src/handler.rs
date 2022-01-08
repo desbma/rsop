@@ -220,9 +220,9 @@ impl HandlerMapping {
         };
 
         if *mode != RsopMode::Identify {
-            let extension = path.extension().map(|e| e.to_str()).flatten();
-            if let Some(extension) = extension {
-                if let Some(handler) = handlers.extensions.get(extension) {
+            for extension in Self::path_extensions(path)? {
+                // TODO lowercase here and in config parsing
+                if let Some(handler) = handlers.extensions.get(&extension) {
                     let mime = if handler.has_pattern('c') {
                         // Probe MIME type even if we already found a handler, to substitude in command
                         Self::path_mime(path).map_err(|e| HandlerError::Input {
@@ -754,6 +754,41 @@ impl HandlerMapping {
         log::debug!("Will run command: {:?}", cmd);
         Ok(cmd)
     }
+
+    fn path_extensions(path: &Path) -> anyhow::Result<Vec<String>> {
+        let mut extensions = Vec::new();
+        if let Some(extension) = path.extension() {
+            // Try to get double extension first if we have one
+            let filename = path
+                .file_name()
+                .map(|f| f.to_str())
+                .flatten()
+                .ok_or_else(|| anyhow::anyhow!("Unable to get file name from path {:?}", path))?;
+            let double_ext_parts: Vec<_> = filename
+                .split('.')
+                .skip(1)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            if double_ext_parts.len() == 2 {
+                extensions.push(double_ext_parts.join("."));
+            }
+            extensions.push(
+                extension
+                    .to_str()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Unable to decode extension for path {:?}", path)
+                    })?
+                    .to_string(),
+            );
+        }
+        Ok(extensions)
+    }
 }
 
 #[cfg(test)]
@@ -776,6 +811,30 @@ mod tests {
         assert_eq!(
             HandlerMapping::substitute("ab%c def", &path, None, &term_size),
             "ab85 def"
+        );
+    }
+
+    #[test]
+    fn test_path_extensions() {
+        assert_eq!(
+            HandlerMapping::path_extensions(&Path::new("/tmp/")).ok(),
+            Some(vec![])
+        );
+        assert_eq!(
+            HandlerMapping::path_extensions(&Path::new("/tmp/foo")).ok(),
+            Some(vec![])
+        );
+        assert_eq!(
+            HandlerMapping::path_extensions(&Path::new("/tmp/foo.bar")).ok(),
+            Some(vec!["bar".to_string()])
+        );
+        assert_eq!(
+            HandlerMapping::path_extensions(&Path::new("/tmp/foo.bar.baz")).ok(),
+            Some(vec!["bar.baz".to_string(), "baz".to_string()])
+        );
+        assert_eq!(
+            HandlerMapping::path_extensions(&Path::new("/tmp/foo.bar.baz.blah")).ok(),
+            Some(vec!["baz.blah".to_string(), "blah".to_string()])
         );
     }
 }
