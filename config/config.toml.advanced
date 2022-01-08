@@ -66,6 +66,7 @@ mimes = [
 
 [filetype.audio]
 mimes = ["audio"]
+extensions = ["m4a"]
 
 [filetype.binary]
 mimes = ["application/octet-stream"]
@@ -81,6 +82,9 @@ mimes = ["application/vnd.debian.binary-package"]
 
 [filetype.directory]
 mimes = ["inode/directory"]
+
+[filetype.ebook]
+mimes = ["application/epub+zip"]
 
 [filetype.guitar_tab]
 extensions = ["gp3", "gp4", "gp5", "ptb"]
@@ -98,6 +102,9 @@ extensions = ["svg"]
 
 [filetype.markdown]
 extensions = ["md"]
+
+[filetype.motion_jpeg]
+extensions = ["mp.jpg"]
 
 [filetype.msdocument]
 extensions = ["doc", "docx", "rtf"]
@@ -139,8 +146,8 @@ mimes = [
 mimes = ["application/x-bittorrent"]
 
 [filetype.video]
-mimes = ["application/x-matroska", "video"]
-extensions = ["ogv"]
+mimes = ["video", "application/vnd.ms-asf", "application/x-matroska", "application/x-riff"]
+extensions = ["avi", "ogv"]
 
 [filetype.xz]
 mimes = ["application/x-xz"]
@@ -190,7 +197,7 @@ command = "bsdtar -tf %i | grep -v '/$' | head -n %l | tree -C --noreport --from
 shell = true
 
 [handler_preview.audio]
-command = "mediainfo %i | sed 's@ \\+: @: @' | column -s ':' -t | sed 's@ *$@@'"
+command = "mediainfo %i | sed 's@ \\+: @: @' | column -s ':' -t -l 2 | sed 's@ *$@@'"
 shell = true
 
 [handler_open.audio]
@@ -220,6 +227,10 @@ shell = true
 [handler_open.directory]
 command = "lsd -alFh --tree --color=always --icon=always %i | less -R"
 shell = true
+
+[handler_open.ebook]
+command = "atril %i"
+no_pipe = true
 
 [handler_preview.html]
 command = "w3m -dump %i"
@@ -315,8 +326,8 @@ command = "ffmpegthumbnailer -s 800 -c jpg -q 6 -i %i -o - 2> /dev/null | chafa 
 shell = true
 
 [handler_open.video]
-command = "mpv %i"
-wait = false
+command = "mpv --loop %i"
+no_pipe = true
 
 
 #
@@ -337,6 +348,11 @@ command = "pigz -dc %i"
 
 [filter.xz]
 command = "xz -dc %i"
+
+[filter.motion_jpeg]
+# https://linuxreviews.org/Google_Pixel_%22Motion_Photo%22
+command = "tail -c +$(( $(grep -EUboa '(ftypisom|ftypmp42)' %i | cut -d ':' -f 1) - 3)) %i"
+shell = true
 
 [filter.zstandard]
 command = "zstd -dc %i"
