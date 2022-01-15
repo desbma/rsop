@@ -198,12 +198,17 @@ impl HandlerMapping {
 
     fn path_mime(path: &Path) -> Result<Option<&str>, io::Error> {
         // Rather than read socket/pipe, mimic 'file -ib xxx' behavior and return 'inode/yyy' strings
-        let file_type = path.metadata()?.file_type();
+        let metadata = path.metadata()?;
+        let file_type = metadata.file_type();
         let mime = if file_type.is_socket() {
             Some("inode/socket")
         } else if file_type.is_fifo() {
             Some("inode/fifo")
         } else {
+            // tree_magic_mini::from_filepath returns Option and not a Result<_, io::Error>
+            // so probe first to properly propagate the proper error cause
+            nix::unistd::access(path, nix::unistd::AccessFlags::R_OK)
+                .map_err(|errno| io::Error::from_raw_os_error(errno as i32))?;
             tree_magic_mini::from_filepath(path)
         };
         log::debug!("MIME: {:?}", mime);
@@ -241,7 +246,10 @@ impl HandlerMapping {
             path: path.to_owned(),
         })?;
         if let RsopMode::Identify = mode {
-            println!("{}", mime.unwrap());
+            println!(
+                "{}",
+                mime.ok_or_else(|| anyhow::anyhow!("Unable to get MIME type for {:?}", path))?
+            );
             return Ok(());
         }
 
