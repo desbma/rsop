@@ -768,8 +768,7 @@ impl HandlerMapping {
             // Try to get double extension first if we have one
             let filename = path
                 .file_name()
-                .map(|f| f.to_str())
-                .flatten()
+                .and_then(|f| f.to_str())
                 .ok_or_else(|| anyhow::anyhow!("Unable to get file name from path {:?}", path))?;
             let double_ext_parts: Vec<_> = filename
                 .split('.')
