@@ -9,6 +9,7 @@
 # - delta  https://github.com/dandavison/delta
 # - dpkg  https://wiki.debian.org/Teams/Dpkg
 # - ffmpegthumbnailer  https://github.com/dirkvdb/ffmpegthumbnailer
+# - ffprobe  https://ffmpeg.org/
 # - firefox  https://firefox.com/
 # - hexyl  https://github.com/sharkdp/hexyl
 # - imv  https://github.com/eXeC64/imv
@@ -16,6 +17,7 @@
 # - lsd  https://github.com/Peltoche/lsd
 # - mdcat  https://github.com/lunaryorn/mdcat
 # - mediainfo  https://mediaarea.net/en/MediaInfo
+# - moreutils  https://joeyh.name/code/moreutils/
 # - mpv  https://mpv.io/
 # - odt2txt  https://github.com/dstosberg/odt2txt/
 # - openscad  https://openscad.org/
@@ -28,6 +30,7 @@
 # - sqlite3  https://www.sqlite.org/index.html
 # - ss  https://git.kernel.org/pub/scm/network/iproute2/iproute2.git
 # - subl  https://www.sublimetext.com/
+# - transmission-remote-gtk  https://github.com/transmission-remote-gtk/transmission-remote-gtk
 # - transmission-show  https://transmissionbt.com/
 # - tree  http://mama.indstate.edu/users/ice/tree/
 # - tshark  https://www.wireshark.org/
@@ -83,7 +86,7 @@ mimes = ["application/vnd.debian.binary-package"]
 [filetype.directory]
 mimes = ["inode/directory"]
 
-[filetype.ebook]
+[filetype.epub]
 mimes = ["application/epub+zip"]
 
 [filetype.guitar_tab]
@@ -103,11 +106,14 @@ extensions = ["svg"]
 [filetype.markdown]
 extensions = ["md"]
 
+[filetype.mobi]
+extensions = ["mobi"]
+
 [filetype.motion_jpeg]
 extensions = ["mp.jpg"]
 
 [filetype.msdocument]
-extensions = ["doc", "docx", "rtf"]
+extensions = ["doc", "docx", "rtf", "xlsx"]
 mimes = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/rtf"]
 
 [filetype.opendocument]
@@ -148,6 +154,9 @@ mimes = ["application/x-bittorrent"]
 [filetype.video]
 mimes = ["video", "application/vnd.ms-asf", "application/x-matroska", "application/x-riff"]
 extensions = ["avi", "ogv"]
+
+[filetype.xsv]
+extensions = ["csv", "tsv"]
 
 [filetype.xz]
 mimes = ["application/x-xz"]
@@ -196,6 +205,10 @@ stdin_arg = ""
 command = "bsdtar -tf %i | grep -v '/$' | head -n %l | tree -C --noreport --fromfile . | tail -n +2 | sed 's@^....@@'"
 shell = true
 
+[handler_open.archive]
+command = "set -e; set -o pipefail; bsdtar -tf %i | grep -v /$ | fzf -m --preview='bsdtar -xOf %i {} | rsp' --print0 | xargs -0r bsdtar -xOf %i | ifne rso"
+shell = true
+
 [handler_preview.audio]
 command = "mediainfo %i | sed 's@ \\+: @: @' | column -s ':' -t -l 2 | sed 's@ *$@@'"
 shell = true
@@ -228,7 +241,7 @@ shell = true
 command = "lsd -alFh --tree --color=always --icon=always %i | less -R"
 shell = true
 
-[handler_open.ebook]
+[handler_open.epub]
 command = "atril %i"
 no_pipe = true
 
@@ -257,6 +270,10 @@ command = "mdcat %i"
 [handler_open.markdown]
 command = "retext %i"
 wait = false
+
+[handler_open.mobi]
+command = "FBReader %i"
+no_pipe = true
 
 [handler_preview.msdocument]
 command = "pandoc -s -t markdown -- %i | mdcat"
@@ -311,6 +328,11 @@ command = "sqlite3 %i .dump | bat -P --color=always -n --terminal-width %c -r :%
 shell = true
 no_pipe = true
 
+[handler_open.sqlite]
+command = "sqlite3 %i .dump | bat --paging always --color=always -n --terminal-width %c -l sql"
+shell = true
+no_pipe = true
+
 [handler_preview.text]
 command = "bat -P --color=always -n --terminal-width %c -r :%l %i"
 
@@ -321,12 +343,24 @@ command = "subl %i"
 command = "transmission-show -- %i"
 no_pipe = true
 
+[handler_open.torrent]
+command = "transmission-remote-gtk -- %i"
+no_pipe = true
+
 [handler_preview.video]
-command = "ffmpegthumbnailer -s 800 -c jpg -q 6 -i %i -o - 2> /dev/null | chafa -s %cx%l -"
+command = "s=$(ffprobe -hide_banner %i 2>&1 | grep -E '^  (Stream|Duration)' | sed 's@^  Stream [^ ]*:@@' | sed 's@ *@@'); l=$(echo \"$s\" | wc -l); ffmpegthumbnailer -s 800 -c jpg -q 6 -i %i -o - 2> /dev/null | chafa -s %cx$((%l - l)) -; echo \"$s\""
 shell = true
+no_pipe = true
 
 [handler_open.video]
 command = "mpv --loop %i"
+no_pipe = true
+
+[handler_preview.xsv]
+command = "bat -P --color=always -n --terminal-width %c -r :%l -l csv %i"
+
+[handler_open.xsv]
+command = "libreoffice %i"
 no_pipe = true
 
 
@@ -346,13 +380,13 @@ command = "pbzip2 -dc %i"
 [filter.gzip]
 command = "pigz -dc %i"
 
-[filter.xz]
-command = "xz -dc %i"
-
 [filter.motion_jpeg]
 # https://linuxreviews.org/Google_Pixel_%22Motion_Photo%22
 command = "tail -c +$(( $(grep -EUboa '(ftypisom|ftypmp42)' %i | cut -d ':' -f 1) - 3)) %i"
 shell = true
+
+[filter.xz]
+command = "xz -dc %i"
 
 [filter.zstandard]
 command = "zstd -dc %i"

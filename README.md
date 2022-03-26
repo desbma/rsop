@@ -116,6 +116,8 @@ pa() {
 
 [![preview archive](./demo/preview-archive.gif)](https://raw.githubusercontent.com/desbma/rsop/master/demo/preview-archive.gif)
 
+**This is now integrated in the [advanced config example](./config/config.toml.advanced), so you can just run `rso <archive>` and get the same result.**
+
 ## Performance
 
 `rsop` is quite fast. In practice it rarely matters because choosing with which program to open or preview files is usually so quick it is not perceptible. However performance can matter if for example you are decompressing a huge `tar.gz` archive to preview its content.
@@ -123,7 +125,7 @@ To help with that, `rsop` uses the [`splice` system call](https://man7.org/linux
 
 Other stuff `rsop` does to remain quick:
 
-- it is written in Rust (forgetting the RiiR memes, this avoid the 20-50ms startup time of for example Python interpreters)
+- it is written in Rust (setting aside the RiiR memes, this avoid the 20-50ms startup time of for example Python interpreters)
 - it uses hashtables to search for handlers from MIME types or extensions in constant time
 - it uses the great [tree_magic_mini crate](https://crates.io/crates/tree_magic_mini) for fast MIME identification
 
