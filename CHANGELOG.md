@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.1 - 2022-03-30
+
+### Bug Fixes
+
+- Run check/tests in release script
+
+### Features
+
+- Improve reporting of rsi errors
+- Update advanced config
+- Update advanced config
+- Add check for invalid config with no_pipe=false and multiple input patterns
+
+### Miscellaneous Tasks
+
+- Lint
+- Version 1.2.1
+
 ## 1.2.0 - 2022-01-08
 
 ### Features
