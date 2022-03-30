@@ -387,6 +387,7 @@ command = "pigz -dc %i"
 # https://linuxreviews.org/Google_Pixel_%22Motion_Photo%22
 command = "tail -c +$(( $(grep -EUboa '(ftypisom|ftypmp42)' %i | cut -d ':' -f 1) - 3)) %i"
 shell = true
+no_pipe = true
 
 [filter.xz]
 command = "xz -dc %i"

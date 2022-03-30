@@ -28,9 +28,9 @@ enum PipeOrTmpFile<T> {
 }
 
 impl FileProcessor {
-    // Return true if command string contains a given % prefixed pattern
+    /// Return true if command string contains a given % prefixed pattern
     fn has_pattern(&self, pattern: char) -> bool {
-        let re_str = format!("([^%])(%{})", pattern);
+        let re_str = format!("[^%]%{}", pattern);
         let re = regex::Regex::new(&re_str).unwrap();
         let command = match self {
             FileProcessor::Filter(f) => &f.command,
@@ -141,6 +141,11 @@ impl HandlerMapping {
                     "Open handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
                     handler_open
                 );
+                anyhow::ensure!(
+                    handler_open.no_pipe || (Self::count_pattern(&handler_open.command, 'i') <= 1),
+                    "Open handler {:?} can not have both 'no_pipe = false' and multiple %i in command",
+                    handler_open
+                );
                 handlers_open.add(Rc::new(FileProcessor::Handler(handler_open)), filetype);
             }
             if let Some(handler_preview) = handler_preview {
@@ -149,9 +154,19 @@ impl HandlerMapping {
                     "Preview handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
                     handler_preview
                 );
+                anyhow::ensure!(
+                    handler_preview.no_pipe || (Self::count_pattern(&handler_preview.command, 'i') <= 1),
+                    "Preview handler {:?} can not have both 'no_pipe = false' and multiple %i in command",
+                    handler_preview
+                );
                 handlers_preview.add(Rc::new(FileProcessor::Handler(handler_preview)), filetype);
             }
             if let Some(filter) = filter {
+                anyhow::ensure!(
+                    filter.no_pipe || (Self::count_pattern(&filter.command, 'i') <= 1),
+                    "Filter {:?} can not have both 'no_pipe = false' and multiple %i in command",
+                    filter
+                );
                 let proc_filter = Rc::new(FileProcessor::Filter(filter));
                 handlers_open.add(proc_filter.clone(), filetype);
                 handlers_preview.add(proc_filter, filetype);
@@ -168,6 +183,13 @@ impl HandlerMapping {
             handlers_open,
             handlers_scheme,
         })
+    }
+
+    /// Count number of a given % prefixed pattern in command string
+    fn count_pattern(command: &str, pattern: char) -> usize {
+        let re_str = format!("[^%]%{}", pattern);
+        let re = regex::Regex::new(&re_str).unwrap();
+        re.find_iter(command).count()
     }
 
     pub fn handle_path(&self, mode: RsopMode, path: &Path) -> Result<(), HandlerError> {
@@ -228,7 +250,7 @@ impl HandlerMapping {
             for extension in Self::path_extensions(path)? {
                 if let Some(handler) = handlers.extensions.get(&extension) {
                     let mime = if handler.has_pattern('c') {
-                        // Probe MIME type even if we already found a handler, to substitude in command
+                        // Probe MIME type even if we already found a handler, to substitute in command
                         Self::path_mime(path).map_err(|e| HandlerError::Input {
                             err: e,
                             path: path.to_owned(),
@@ -800,6 +822,45 @@ impl HandlerMapping {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_has_pattern() {
+        let mut handler = FileHandler {
+            command: "a ii".to_string(),
+            wait: false,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: Some("".to_string()),
+        };
+        let mut processor = FileProcessor::Handler(handler.to_owned());
+        assert!(!processor.has_pattern('m'));
+        assert!(!processor.has_pattern('i'));
+
+        handler.command = "a %i".to_string();
+        processor = FileProcessor::Handler(handler.to_owned());
+        assert!(!processor.has_pattern('m'));
+        assert!(processor.has_pattern('i'));
+
+        handler.command = "a %%i".to_string();
+        processor = FileProcessor::Handler(handler);
+        assert!(!processor.has_pattern('m'));
+        assert!(!processor.has_pattern('i'));
+    }
+
+    #[test]
+    fn test_count_pattern() {
+        assert_eq!(HandlerMapping::count_pattern("aa ii ii", 'm'), 0);
+        assert_eq!(HandlerMapping::count_pattern("aa ii ii", 'i'), 0);
+
+        assert_eq!(HandlerMapping::count_pattern("a %i", 'm'), 0);
+        assert_eq!(HandlerMapping::count_pattern("a %i", 'i'), 1);
+
+        assert_eq!(HandlerMapping::count_pattern("a %i %i %m", 'm'), 1);
+        assert_eq!(HandlerMapping::count_pattern("a %i %i %m", 'i'), 2);
+
+        assert_eq!(HandlerMapping::count_pattern("a %%i %i %%m", 'm'), 0);
+        assert_eq!(HandlerMapping::count_pattern("a %%i %i %%m", 'i'), 1);
+    }
 
     #[test]
     fn test_substitute() {
