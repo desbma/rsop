@@ -208,7 +208,7 @@ command = "bsdtar -tf %i | grep -v '/$' | head -n %l | tree -C --noreport --from
 shell = true
 
 [handler_open.archive]
-command = "set -o pipefail 2> /dev/null; set -e; bsdtar -tf %i | grep -v /$ | fzf -m --preview='bsdtar -xOf %i {} | rsp' --print0 | xargs -0r bsdtar -xOf %i | ifne rso"
+command = "bsdtar -tf %i | grep -v /$ | fzf -m --preview='bsdtar -xOf %i {} | rsp' --print0 | xargs -0r bsdtar -xOf %i | ifne rso"
 shell = true
 no_pipe = true
 
