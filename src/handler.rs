@@ -550,7 +550,6 @@ impl HandlerMapping {
                     let mut filter_child_stdin = filter_child.stdin.take().unwrap();
                     scope.spawn(move |_| {
                         Self::pipe_forward(&mut pipe, &mut filter_child_stdin, header)
-                            .expect("Pipe forward failed in thread")
                     });
                 }
 
@@ -563,7 +562,7 @@ impl HandlerMapping {
 
                 r
             })
-            .unwrap(),
+            .map_err(|e| anyhow::anyhow!("Worker thread error: {:?}", e))?,
         }
     }
 
