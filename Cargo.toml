@@ -25,4 +25,4 @@ url = "2.2"
 xdg = "2.1"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-nix = "0.22"
+nix = { version = "0.22", default-features = false }
