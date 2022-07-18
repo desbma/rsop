@@ -105,6 +105,9 @@ mimes = ["text/html"]
 mimes = ["image"]
 extensions = ["svg"]
 
+[filetype.jpeg]
+mimes = ["image/jpeg"]
+
 [filetype.markdown]
 extensions = ["md"]
 
@@ -249,6 +252,10 @@ shell = true
 command = "atril %i"
 no_pipe = true
 
+[handler_open.guitar_tab]
+command = "tuxguitar %i"
+no_pipe = true
+
 [handler_preview.html]
 command = "w3m -dump %i"
 no_pipe = true
@@ -264,9 +271,14 @@ command = "chafa -s %cx%l %i"
 command = "imv %i"
 wait = false
 
-[handler_open.guitar_tab]
-command = "tuxguitar %i"
-no_pipe = true
+[handler_preview.jpeg]
+command = "exiftran -a -o /dev/stdout %i | chafa -s %cx%l"
+shell = true
+stdin_arg = "/dev/stdin"
+
+[handler_open.jpeg]
+command = "imv %i"
+wait = false
 
 [handler_preview.markdown]
 command = "mdcat %i"
