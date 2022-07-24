@@ -1,15 +1,11 @@
 use std::collections::HashMap;
 use std::env;
-#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::fs::File;
-use std::io::{self, stdin, Read, Write};
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-use std::io::{copy, StdinLock};
+use std::io::{self, copy, Read, Write};
 use std::os::unix::fs::FileTypeExt;
-#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdout, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 
 use crate::config;
@@ -108,20 +104,6 @@ lazy_static::lazy_static! {
         nix::unistd::sysconf(nix::unistd::SysconfVar::PAGE_SIZE).expect("Unable to get page size").unwrap() as usize;
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-trait ReadPipe: Read + Send {}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-trait ReadPipe: Read + AsRawFd + Send {}
-
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-impl ReadPipe for StdinLock<'_> {}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-impl ReadPipe for File {}
-
-impl ReadPipe for ChildStdout {}
-
 impl HandlerMapping {
     pub fn new(cfg: &config::Config) -> anyhow::Result<HandlerMapping> {
         let mut handlers_open = FileHandlers::new(&cfg.default_handler_open);
@@ -214,7 +196,10 @@ impl HandlerMapping {
     }
 
     pub fn handle_pipe(&self, mode: RsopMode) -> Result<(), HandlerError> {
-        let stdin = Self::stdin_reader()?;
+        let stdin_locked = io::stdin().lock();
+        // Unlocked stdin via io::stdin does not allow use of copy optimisation (splice & co)
+        // The conversion to File via its fd allows breaking the Send requirement of the MutexGuard
+        let stdin = unsafe { File::from_raw_fd(stdin_locked.as_raw_fd()) };
         self.dispatch_pipe(stdin, &mode)
     }
 
@@ -301,7 +286,7 @@ impl HandlerMapping {
     #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_pipe<T>(&self, mut pipe: T, mode: &RsopMode) -> Result<(), HandlerError>
     where
-        T: ReadPipe,
+        T: Read + Send,
     {
         // Handler candidates
         let handlers = match mode {
@@ -520,7 +505,7 @@ impl HandlerMapping {
         mode: &RsopMode,
     ) -> Result<(), HandlerError>
     where
-        T: ReadPipe,
+        T: Read + Send,
     {
         let term_size = Self::term_size();
 
@@ -609,7 +594,7 @@ impl HandlerMapping {
         term_size: &termsize::Size,
     ) -> Result<(), HandlerError>
     where
-        T: ReadPipe,
+        T: Read + Send,
     {
         // Write to a temporary file if handler does not support reading from stdin
         let input = if handler.no_pipe {
@@ -683,26 +668,8 @@ impl HandlerMapping {
         Ok(())
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    fn stdin_reader() -> anyhow::Result<StdinLock<'static>> {
-        let stdin = Box::leak(Box::new(stdin()));
-        Ok(stdin.lock())
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    fn stdin_reader() -> anyhow::Result<File> {
-        // Unfortunately, stdin is buffered, and there is no clean way to get it
-        // unbuffered to read only what we want for the header, so use fd hack to get an unbuffered reader
-        // see https://users.rust-lang.org/t/add-unbuffered-rawstdin-rawstdout/26013
-        // On plaforms other than linux we don't care about buffering because we use chunk copy instead of splice
-        let stdin = stdin();
-        let reader = unsafe { File::from_raw_fd(stdin.as_raw_fd()) };
-        Ok(reader)
-    }
-
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    // Default chunk copy using stdlib's std::io::copy when splice syscall is not available
-    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<u64>
+    // Default copy using stdlib's std::io::copy (uses splice syscall when available on Linux)
+    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<usize>
     where
         S: Read,
         D: Write,
@@ -710,7 +677,7 @@ impl HandlerMapping {
         dst.write_all(header)?;
         log::trace!("Header written ({} bytes)", header.len());
 
-        let copied = copy(src, dst)?;
+        let copied = copy(src, dst)? as usize;
         log::trace!(
             "Pipe exhausted, moved {} bytes total",
             header.len() + copied
@@ -719,49 +686,9 @@ impl HandlerMapping {
         Ok(header.len() + copied)
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    // Efficient 0-copy implementation using splice
-    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<usize>
-    where
-        S: AsRawFd,
-        D: AsRawFd + Write,
-    {
-        dst.write_all(header)?;
-        log::trace!("Header written ({} bytes)", header.len());
-
-        let mut c = 0;
-        const SPLICE_LEN: usize = 2usize.pow(62); // splice returns -EINVAL for pipe to file with usize::MAX len
-        const SPLICE_FLAGS: nix::fcntl::SpliceFFlags = nix::fcntl::SpliceFFlags::empty();
-
-        loop {
-            let rc = nix::fcntl::splice(
-                src.as_raw_fd(),
-                None,
-                dst.as_raw_fd(),
-                None,
-                SPLICE_LEN,
-                SPLICE_FLAGS,
-            );
-            let moved = match rc {
-                Err(e) if e == nix::errno::Errno::EPIPE => 0,
-                Err(e) => return Err(anyhow::Error::new(e)),
-                Ok(m) => m,
-            };
-            log::trace!("moved = {}", moved);
-            if moved == 0 {
-                break;
-            }
-            c += moved;
-        }
-
-        log::trace!("Pipe exhausted, moved {} bytes total", header.len() + c);
-
-        Ok(header.len() + c)
-    }
-
     fn pipe_to_tmpfile<T>(header: &[u8], mut pipe: T) -> anyhow::Result<tempfile::NamedTempFile>
     where
-        T: ReadPipe,
+        T: Read + Send,
     {
         let mut tmp_file = tempfile::Builder::new()
             .prefix(const_format::concatcp!(env!("CARGO_PKG_NAME"), '_'))

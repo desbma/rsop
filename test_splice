@@ -1,0 +1,21 @@
+#!/bin/bash -eu
+
+set -o pipefail
+
+
+# auto cleanup
+at_exit() {
+  set +u
+  rm -Rf "$TMP_DIR"
+  set -u
+}
+trap at_exit EXIT
+
+readonly TMP_FILE="$(mktemp /tmp/"$(basename -- "$0")".XXXXXXXXXX)"
+
+
+dd if=/dev/urandom of="${TMP_FILE}" bs=4k count=1000
+
+cargo build --release
+
+RSOP_MODE=preview strace ./target/release/rsop <"${TMP_FILE}" 2>&1 | grep splice

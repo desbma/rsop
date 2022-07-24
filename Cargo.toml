@@ -9,6 +9,7 @@ const_format = { version = "0.2", features = ["const_generics"] }
 crossbeam-utils = "0.8"
 lazy_static = "1.4"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
+nix = { version = "0.22", default-features = false }
 regex = "1.5"
 serde = { version = "1.0", features = ["derive"]}
 shlex = "1.0.0"
@@ -23,6 +24,3 @@ toml = "0.5"
 tree_magic_mini = "3.0"
 url = "2.2"
 xdg = "2.1"
-
-[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-nix = { version = "0.22", default-features = false }
