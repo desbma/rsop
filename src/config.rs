@@ -12,7 +12,7 @@ pub struct Filetype {
     pub mimes: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize)]
 pub struct FileHandler {
     pub command: String,
     #[serde(default = "default_file_handler_wait")]

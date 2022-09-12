@@ -14,6 +14,7 @@ mod handler;
 #[derive(
     Clone,
     Debug,
+    Eq,
     PartialEq,
     strum_macros::EnumString,
     strum_macros::EnumVariantNames,
