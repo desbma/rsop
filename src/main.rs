@@ -12,13 +12,7 @@ mod config;
 mod handler;
 
 #[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    strum_macros::EnumString,
-    strum_macros::EnumVariantNames,
-    strum_macros::ToString,
+    Clone, Debug, Eq, PartialEq, strum::Display, strum::EnumString, strum::EnumVariantNames,
 )]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "kebab-case")]
