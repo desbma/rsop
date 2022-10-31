@@ -590,7 +590,9 @@ impl HandlerMapping {
         if tmp_file.is_none() {
             command.stdin(Stdio::piped());
         } else {
-            command.stdin(Stdio::null());
+            command
+                .stdin(Stdio::null())
+                .env("RSOP_INPUT_IS_STDIN_COPY", "1");
         }
         command.stdout(Stdio::piped());
         let child = command.spawn().map_err(|e| HandlerError::Start {
@@ -635,7 +637,9 @@ impl HandlerMapping {
         if let PipeOrTmpFile::Pipe(_) = input {
             command.stdin(Stdio::piped());
         } else {
-            command.stdin(Stdio::null());
+            command
+                .stdin(Stdio::null())
+                .env("RSOP_INPUT_IS_STDIN_COPY", "1");
         }
         if !handler.wait {
             command.stdout(Stdio::null());
