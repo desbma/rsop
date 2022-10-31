@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.2 - 2022-10-31
+
+### Bug Fixes
+
+- Archive open handler in advanced config example
+- Disable default nix features
+
+### Features
+
+- Update advanced config
+- Improve error handling in worker threads
+- Update advanced config
+- Build with full LTO + strip
+- Add RSOP_INPUT_IS_STDIN_COPY·env·var.
+
+### Miscellaneous Tasks
+
+- Lint
+- Update dependencies
+- Rename release script
+- Version 1.2.2
+
 ## 1.2.1 - 2022-03-30
 
 ### Bug Fixes
