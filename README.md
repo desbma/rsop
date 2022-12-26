@@ -15,6 +15,7 @@ If you spend most time in a terminal, and are unsatisfied by current solutions t
 - Start program to view/edit file according to extension or MIME type
 - Provides three commands (all symlinks to a single `rsop` binary):
   - `rso`: open file
+  - `rse`: edit file (similar to `rso` in most cases, except when open to view or edit have a different handler)
   - `rsp`: preview files in terminal, to be used for example in terminal file managers or [`fzf`](https://github.com/junegunn/fzf) preview panel
   - `rsi`: to identify MIME type
 - Supports opening and previewing from data piped on stdin (very handy for advanced shell scripting, see [below](#show-me-some-cool-stuff-rsop-can-do))
@@ -42,6 +43,7 @@ cargo build --release
 install -Dm 755 -t /usr/local/bin target/release/rsop
 ln -rsv /usr/local/bin/rs{op,p}
 ln -rsv /usr/local/bin/rs{op,o}
+ln -rsv /usr/local/bin/rs{op,e}
 ln -rsv /usr/local/bin/rs{op,i}
 # to replace system xdg-open:
 ln -rsv /usr/local/bin/{rsop,xdg-open}
@@ -142,6 +144,16 @@ Other stuff `rsop` does to remain quick:
 "**R**eally **S**imple **O**pener/**P**reviewer" or "**R**eliable **S**imple **O**pener/**P**reviewer" or "**R**u**S**t **O**pener/**P**reviewer"
 
 I haven't really decided yet...
+
+### What is the difference between the open, edit and preview actions?
+
+Each action has customizable handlers, so they only do what you set them to do.
+
+However the philosophy is the following :
+
+- preview is **non interactive**, typically with only terminal UI, and a maximum number of lines in the output
+- open can be interactive or not, and can open graphical windows or not
+- edit is **interactive**, defaults to the open handler if no edit handler is set, and only makes sense if you need an action separate from open, for example to edit images with GIMP versus to view them with just an image viewer
 
 ## License
 

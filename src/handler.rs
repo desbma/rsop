@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{self, stdin, Read, Write};
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 use std::io::{copy, StdinLock};
+use std::iter;
 use std::os::unix::fs::FileTypeExt;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -87,6 +88,7 @@ impl SchemeHandlers {
 pub struct HandlerMapping {
     handlers_preview: FileHandlers,
     handlers_open: FileHandlers,
+    handlers_edit: FileHandlers,
     handlers_scheme: SchemeHandlers,
 }
 
@@ -125,40 +127,31 @@ impl ReadPipe for ChildStdout {}
 impl HandlerMapping {
     pub fn new(cfg: &config::Config) -> anyhow::Result<HandlerMapping> {
         let mut handlers_open = FileHandlers::new(&cfg.default_handler_open);
+        let mut handlers_edit = FileHandlers::new(&cfg.default_handler_open);
         let mut handlers_preview = FileHandlers::new(&cfg.default_handler_preview);
         for (name, filetype) in &cfg.filetype {
             let handler_open = cfg.handler_open.get(name).cloned();
+            let handler_edit = cfg.handler_edit.get(name).cloned();
             let handler_preview = cfg.handler_preview.get(name).cloned();
             let filter = cfg.filter.get(name).cloned();
             anyhow::ensure!(
-                handler_open.is_some() || handler_preview.is_some() || filter.is_some(),
+                handler_open.is_some()
+                    || handler_edit.is_some()
+                    || handler_preview.is_some()
+                    || filter.is_some(),
                 "Filetype {} is not bound to any handler or filter",
                 name
             );
             if let Some(handler_open) = handler_open {
-                anyhow::ensure!(
-                    !handler_open.no_pipe || handler_open.wait,
-                    "Open handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
-                    handler_open
-                );
-                anyhow::ensure!(
-                    handler_open.no_pipe || (Self::count_pattern(&handler_open.command, 'i') <= 1),
-                    "Open handler {:?} can not have both 'no_pipe = false' and multiple %i in command",
-                    handler_open
-                );
+                Self::validate_handler(&handler_open)?;
                 handlers_open.add(Rc::new(FileProcessor::Handler(handler_open)), filetype);
             }
+            if let Some(handler_edit) = handler_edit {
+                Self::validate_handler(&handler_edit)?;
+                handlers_edit.add(Rc::new(FileProcessor::Handler(handler_edit)), filetype);
+            }
             if let Some(handler_preview) = handler_preview {
-                anyhow::ensure!(
-                    !handler_preview.no_pipe || handler_preview.wait,
-                    "Preview handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
-                    handler_preview
-                );
-                anyhow::ensure!(
-                    handler_preview.no_pipe || (Self::count_pattern(&handler_preview.command, 'i') <= 1),
-                    "Preview handler {:?} can not have both 'no_pipe = false' and multiple %i in command",
-                    handler_preview
-                );
+                Self::validate_handler(&handler_preview)?;
                 handlers_preview.add(Rc::new(FileProcessor::Handler(handler_preview)), filetype);
             }
             if let Some(filter) = filter {
@@ -169,6 +162,7 @@ impl HandlerMapping {
                 );
                 let proc_filter = Rc::new(FileProcessor::Filter(filter));
                 handlers_open.add(proc_filter.clone(), filetype);
+                handlers_edit.add(proc_filter.clone(), filetype);
                 handlers_preview.add(proc_filter, filetype);
             }
         }
@@ -181,8 +175,23 @@ impl HandlerMapping {
         Ok(HandlerMapping {
             handlers_preview,
             handlers_open,
+            handlers_edit,
             handlers_scheme,
         })
+    }
+
+    fn validate_handler(handler: &FileHandler) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            !handler.no_pipe || handler.wait,
+            "Handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
+            handler
+        );
+        anyhow::ensure!(
+            handler.no_pipe || (Self::count_pattern(&handler.command, 'i') <= 1),
+            "Handler {:?} can not have both 'no_pipe = false' and multiple %i in command",
+            handler
+        );
+        Ok(())
     }
 
     /// Count number of a given % prefixed pattern in command string
@@ -241,50 +250,58 @@ impl HandlerMapping {
     #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> Result<(), HandlerError> {
         // Handler candidates
-        let handlers = match mode {
-            RsopMode::Preview => &self.handlers_preview,
-            RsopMode::Open | _ => &self.handlers_open,
+        let (handlers, next_handlers) = match mode {
+            RsopMode::Preview => (&self.handlers_preview, None),
+            RsopMode::Edit => (&self.handlers_edit, Some(&self.handlers_open)),
+            RsopMode::Open | _ => (&self.handlers_open, Some(&self.handlers_edit)),
         };
 
-        if *mode != RsopMode::Identify {
-            for extension in Self::path_extensions(path)? {
-                if let Some(handler) = handlers.extensions.get(&extension) {
-                    let mime = if handler.has_pattern('c') {
-                        // Probe MIME type even if we already found a handler, to substitute in command
-                        Self::path_mime(path).map_err(|e| HandlerError::Input {
-                            err: e,
-                            path: path.to_owned(),
-                        })?
-                    } else {
-                        None
-                    };
-                    return self.run_path(handler, path, mode, mime);
+        let handlers_it = iter::once(handlers).chain(next_handlers.into_iter());
+        let mut mime = None;
+
+        for handlers in handlers_it {
+            if *mode != RsopMode::Identify {
+                for extension in Self::path_extensions(path)? {
+                    if let Some(handler) = handlers.extensions.get(&extension) {
+                        let mime = if handler.has_pattern('c') {
+                            // Probe MIME type even if we already found a handler, to substitute in command
+                            Self::path_mime(path).map_err(|e| HandlerError::Input {
+                                err: e,
+                                path: path.to_owned(),
+                            })?
+                        } else {
+                            None
+                        };
+                        return self.run_path(handler, path, mode, mime);
+                    }
                 }
             }
-        }
 
-        let mime = Self::path_mime(path).map_err(|e| HandlerError::Input {
-            err: e,
-            path: path.to_owned(),
-        })?;
-        if let RsopMode::Identify = mode {
-            println!(
-                "{}",
-                mime.ok_or_else(|| anyhow::anyhow!("Unable to get MIME type for {:?}", path))?
-            );
-            return Ok(());
-        }
-
-        if let Some(mime) = mime {
-            if let Some(handler) = handlers.mimes.get(mime) {
-                return self.run_path(handler, path, mode, Some(mime));
+            if mime.is_none() {
+                mime = Self::path_mime(path).map_err(|e| HandlerError::Input {
+                    err: e,
+                    path: path.to_owned(),
+                })?;
+            }
+            if let RsopMode::Identify = mode {
+                println!(
+                    "{}",
+                    mime.ok_or_else(|| anyhow::anyhow!("Unable to get MIME type for {:?}", path))?
+                );
+                return Ok(());
             }
 
-            // Try "main" MIME type
-            let mime_main = mime.split('/').next();
-            if let Some(mime_main) = mime_main {
-                if let Some(handler) = handlers.mimes.get(mime_main) {
+            if let Some(mime) = mime {
+                if let Some(handler) = handlers.mimes.get(mime) {
                     return self.run_path(handler, path, mode, Some(mime));
+                }
+
+                // Try "main" MIME type
+                let mime_main = mime.split('/').next();
+                if let Some(mime_main) = mime_main {
+                    if let Some(handler) = handlers.mimes.get(mime_main) {
+                        return self.run_path(handler, path, mode, Some(mime));
+                    }
                 }
             }
         }

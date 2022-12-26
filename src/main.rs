@@ -20,6 +20,7 @@ pub enum RsopMode {
     Preview,
     Open,
     XdgOpen,
+    Edit,
     Identify,
 }
 
@@ -35,6 +36,7 @@ lazy_static::lazy_static! {
         m.insert("rsp", RsopMode::Preview);
         m.insert("rso", RsopMode::Open);
         m.insert("xdg-open", RsopMode::XdgOpen);
+        m.insert("rse", RsopMode::Edit);
         m.insert("rsi", RsopMode::Identify);
         m
     };

@@ -59,6 +59,9 @@ pub struct Config {
     pub default_handler_open: FileHandler,
 
     #[serde(default)]
+    pub handler_edit: HashMap<String, FileHandler>,
+
+    #[serde(default)]
     pub filter: HashMap<String, FileFilter>,
 
     #[serde(default)]
