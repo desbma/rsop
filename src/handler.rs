@@ -871,15 +871,15 @@ mod tests {
         let path = Path::new("");
 
         assert_eq!(
-            HandlerMapping::substitute("abc def", &path, None, &term_size),
+            HandlerMapping::substitute("abc def", path, None, &term_size),
             "abc def"
         );
         assert_eq!(
-            HandlerMapping::substitute("ab%%c def", &path, None, &term_size),
+            HandlerMapping::substitute("ab%%c def", path, None, &term_size),
             "ab%c def"
         );
         assert_eq!(
-            HandlerMapping::substitute("ab%c def", &path, None, &term_size),
+            HandlerMapping::substitute("ab%c def", path, None, &term_size),
             "ab85 def"
         );
     }
@@ -887,27 +887,27 @@ mod tests {
     #[test]
     fn test_path_extensions() {
         assert_eq!(
-            HandlerMapping::path_extensions(&Path::new("/tmp/")).ok(),
+            HandlerMapping::path_extensions(Path::new("/tmp/")).ok(),
             Some(vec![])
         );
         assert_eq!(
-            HandlerMapping::path_extensions(&Path::new("/tmp/foo")).ok(),
+            HandlerMapping::path_extensions(Path::new("/tmp/foo")).ok(),
             Some(vec![])
         );
         assert_eq!(
-            HandlerMapping::path_extensions(&Path::new("/tmp/foo.bar")).ok(),
+            HandlerMapping::path_extensions(Path::new("/tmp/foo.bar")).ok(),
             Some(vec!["bar".to_string()])
         );
         assert_eq!(
-            HandlerMapping::path_extensions(&Path::new("/tmp/foo.bar.baz")).ok(),
+            HandlerMapping::path_extensions(Path::new("/tmp/foo.bar.baz")).ok(),
             Some(vec!["bar.baz".to_string(), "baz".to_string()])
         );
         assert_eq!(
-            HandlerMapping::path_extensions(&Path::new("/tmp/foo.BaR.bAz")).ok(),
+            HandlerMapping::path_extensions(Path::new("/tmp/foo.BaR.bAz")).ok(),
             Some(vec!["bar.baz".to_string(), "baz".to_string()])
         );
         assert_eq!(
-            HandlerMapping::path_extensions(&Path::new("/tmp/foo.bar.baz.blah")).ok(),
+            HandlerMapping::path_extensions(Path::new("/tmp/foo.bar.baz.blah")).ok(),
             Some(vec!["baz.blah".to_string(), "blah".to_string()])
         );
     }

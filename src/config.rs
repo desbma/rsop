@@ -116,7 +116,7 @@ mod tests {
     fn test_tiny_config() {
         const TINY_CONFIG_STR: &str = include_str!("../config/config.toml.tiny");
         let mut config_file = tempfile::NamedTempFile::new().unwrap();
-        config_file.write_all(&TINY_CONFIG_STR.as_bytes()).unwrap();
+        config_file.write_all(TINY_CONFIG_STR.as_bytes()).unwrap();
 
         let res = parse_config_path(config_file.path());
         assert!(res.is_ok());
@@ -153,7 +153,7 @@ mod tests {
         const DEFAULT_CONFIG_STR: &str = include_str!("../config/config.toml.default");
         let mut config_file = tempfile::NamedTempFile::new().unwrap();
         config_file
-            .write_all(&DEFAULT_CONFIG_STR.as_bytes())
+            .write_all(DEFAULT_CONFIG_STR.as_bytes())
             .unwrap();
 
         let res = parse_config_path(config_file.path());
@@ -191,7 +191,7 @@ mod tests {
         const ADVANCED_CONFIG_STR: &str = include_str!("../config/config.toml.advanced");
         let mut config_file = tempfile::NamedTempFile::new().unwrap();
         config_file
-            .write_all(&ADVANCED_CONFIG_STR.as_bytes())
+            .write_all(ADVANCED_CONFIG_STR.as_bytes())
             .unwrap();
 
         let res = parse_config_path(config_file.path());
