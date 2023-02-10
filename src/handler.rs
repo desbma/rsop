@@ -31,7 +31,7 @@ enum PipeOrTmpFile<T> {
 impl FileProcessor {
     /// Return true if command string contains a given % prefixed pattern
     fn has_pattern(&self, pattern: char) -> bool {
-        let re_str = format!("[^%]%{}", pattern);
+        let re_str = format!("[^%]%{pattern}");
         let re = regex::Regex::new(&re_str).unwrap();
         let command = match self {
             FileProcessor::Filter(f) => &f.command,
@@ -196,7 +196,7 @@ impl HandlerMapping {
 
     /// Count number of a given % prefixed pattern in command string
     fn count_pattern(command: &str, pattern: char) -> usize {
-        let re_str = format!("[^%]%{}", pattern);
+        let re_str = format!("[^%]%{pattern}");
         let re = regex::Regex::new(&re_str).unwrap();
         re.find_iter(command).count()
     }
@@ -338,7 +338,7 @@ impl HandlerMapping {
         let mime = tree_magic_mini::from_u8(header);
         log::debug!("MIME: {:?}", mime);
         if let RsopMode::Identify = mode {
-            println!("{}", mime);
+            println!("{mime}");
             return Ok(());
         }
 
@@ -421,7 +421,7 @@ impl HandlerMapping {
         }
         for (val, re_str, unescape_src, unescape_dst) in subst_params {
             let re = regex::Regex::new(re_str).unwrap();
-            r = re.replace_all(&r, format!("${{1}}{}", val)).to_string();
+            r = re.replace_all(&r, format!("${{1}}{val}")).to_string();
             r = r.replace(unescape_src, unescape_dst);
         }
 
