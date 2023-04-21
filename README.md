@@ -71,7 +71,10 @@ In `rifle.conf`:
 
 In `scope.sh`:
 
-    RSOP_MODE=open COLUMNS="$2" LINES="$3" exec rsop "$1"
+    #!/bin/sh
+    RSOP_MODE=preview COLUMNS="$2" LINES="$3" exec rsop "$1"
+
+Dont forget to make it executable with `chmod +x ~/.config/ranger/scope.sh`.
 
 ### Usage with lf
 
