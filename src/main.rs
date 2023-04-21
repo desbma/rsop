@@ -12,22 +12,17 @@ mod config;
 mod handler;
 
 #[derive(
-    Clone, Debug, Eq, PartialEq, strum::Display, strum::EnumString, strum::EnumVariantNames,
+    Clone, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString, strum::EnumVariantNames,
 )]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "kebab-case")]
 pub enum RsopMode {
     Preview,
+    #[default]
     Open,
     XdgOpen,
     Edit,
     Identify,
-}
-
-impl Default for RsopMode {
-    fn default() -> Self {
-        RsopMode::Open
-    }
 }
 
 lazy_static::lazy_static! {
