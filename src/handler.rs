@@ -1,13 +1,11 @@
 use std::collections::HashMap;
 use std::env;
-#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::fs::File;
-use std::io::{self, stdin, Read, Write};
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
-use std::io::{copy, StdinLock};
+use std::io::copy;
+use std::io::{self, stdin, Read, Write};
 use std::iter;
 use std::os::unix::fs::FileTypeExt;
-#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
@@ -104,10 +102,15 @@ pub enum HandlerError {
     Other(#[from] anyhow::Error),
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 lazy_static::lazy_static! {
     // How many bytes to read from pipe to guess MIME type, use a full memory page
     static ref PIPE_INITIAL_READ_LENGTH: usize =
         nix::unistd::sysconf(nix::unistd::SysconfVar::PAGE_SIZE).expect("Unable to get page size").unwrap() as usize;
+}
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+lazy_static::lazy_static! {
+    static ref PIPE_INITIAL_READ_LENGTH: usize = 4096;
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
@@ -116,10 +119,6 @@ trait ReadPipe: Read + Send {}
 #[cfg(any(target_os = "linux", target_os = "android"))]
 trait ReadPipe: Read + AsRawFd + Send {}
 
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-impl ReadPipe for StdinLock<'_> {}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
 impl ReadPipe for File {}
 
 impl ReadPipe for ChildStdout {}
@@ -238,8 +237,7 @@ impl HandlerMapping {
         } else {
             // tree_magic_mini::from_filepath returns Option and not a Result<_, io::Error>
             // so probe first to properly propagate the proper error cause
-            nix::unistd::access(path, nix::unistd::AccessFlags::R_OK)
-                .map_err(|errno| io::Error::from_raw_os_error(errno as i32))?;
+            File::open(path)?;
             tree_magic_mini::from_filepath(path)
         };
         log::debug!("MIME: {:?}", mime);
@@ -704,13 +702,6 @@ impl HandlerMapping {
         Ok(())
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    fn stdin_reader() -> anyhow::Result<StdinLock<'static>> {
-        let stdin = Box::leak(Box::new(stdin()));
-        Ok(stdin.lock())
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn stdin_reader() -> anyhow::Result<File> {
         // Unfortunately, stdin is buffered, and there is no clean way to get it
         // unbuffered to read only what we want for the header, so use fd hack to get an unbuffered reader
@@ -721,9 +712,9 @@ impl HandlerMapping {
         Ok(reader)
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
     // Default chunk copy using stdlib's std::io::copy when splice syscall is not available
-    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<u64>
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<usize>
     where
         S: Read,
         D: Write,
@@ -731,7 +722,7 @@ impl HandlerMapping {
         dst.write_all(header)?;
         log::trace!("Header written ({} bytes)", header.len());
 
-        let copied = copy(src, dst)?;
+        let copied = copy(src, dst)? as usize;
         log::trace!(
             "Pipe exhausted, moved {} bytes total",
             header.len() + copied
@@ -740,8 +731,8 @@ impl HandlerMapping {
         Ok(header.len() + copied)
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     // Efficient 0-copy implementation using splice
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<usize>
     where
         S: AsRawFd,
