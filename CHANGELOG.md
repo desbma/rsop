@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.0 - 2023-04-23
+
+### Bug Fixes
+
+- Build on MacOS
+
+### Documentation
+
+- Fix ranger scope.sh instructions
+
+### Features
+
+- Support edit action
+
+### Miscellaneous Tasks
+
+- Lint
+- Lint
+- Lint
+- Version 1.3.0
+
+### Testing
+
+- Add macos-latest machine for ci test (#4)
+
 ## 1.2.2 - 2022-10-31
 
 ### Bug Fixes
