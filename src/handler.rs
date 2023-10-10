@@ -261,7 +261,7 @@ impl HandlerMapping {
             if *mode != RsopMode::Identify {
                 for extension in Self::path_extensions(path)? {
                     if let Some(handler) = handlers.extensions.get(&extension) {
-                        let mime = if handler.has_pattern('c') {
+                        let mime = if handler.has_pattern('m') {
                             // Probe MIME type even if we already found a handler, to substitute in command
                             Self::path_mime(path).map_err(|e| HandlerError::Input {
                                 err: e,
