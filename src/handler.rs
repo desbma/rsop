@@ -254,7 +254,7 @@ impl HandlerMapping {
             RsopMode::Open | _ => (&self.handlers_open, Some(&self.handlers_edit)),
         };
 
-        let handlers_it = iter::once(handlers).chain(next_handlers.into_iter());
+        let handlers_it = iter::once(handlers).chain(next_handlers);
         let mut mime = None;
 
         for handlers in handlers_it {
@@ -755,7 +755,7 @@ impl HandlerMapping {
                 SPLICE_FLAGS,
             );
             let moved = match rc {
-                Err(e) if e == nix::errno::Errno::EPIPE => 0,
+                Err(nix::errno::Errno::EPIPE) => 0,
                 Err(e) => return Err(anyhow::Error::new(e)),
                 Ok(m) => m,
             };
