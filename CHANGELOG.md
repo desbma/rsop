@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.1 - 2023-10-10
+
+### Bug Fixes
+
+- %m substitution sometimes skipped
+
+### Miscellaneous Tasks
+
+- Lint
+- Version 1.3.1
+
 ## 1.3.0 - 2023-04-23
 
 ### Bug Fixes
