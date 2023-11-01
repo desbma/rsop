@@ -4,7 +4,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use anyhow::Context;
-use structopt::StructOpt;
+use clap::Parser;
 use strum::VariantNames;
 
 mod cli;
@@ -82,7 +82,7 @@ fn main() -> anyhow::Result<()> {
     // Parse command line opts
     let mode = runtime_mode();
     log::trace!("Runtime mode: {:?}", mode);
-    let cl_opts = cli::CommandLineOpts::from_args();
+    let cl_opts = cli::CommandLineOpts::parse();
     log::trace!("{:?}", cl_opts);
 
     // Parse config

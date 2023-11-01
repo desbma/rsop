@@ -10,6 +10,7 @@ strip = true
 
 [dependencies]
 anyhow = { version = "1.0.66", default-features = false, features = ["backtrace", "std"] }
+clap = { version = "4.4.7", default-features = false, features = ["std", "color", "help", "usage", "error-context", "suggestions", "derive"] }
 const_format = { version = "0.2.30", default-features = false, features = ["const_generics"] }
 crossbeam-utils = { version = "0.8.12", default-features = false, features = ["std"] }
 lazy_static = { version = "1.4.0", default-features = false }
@@ -18,7 +19,6 @@ regex = { version = "1.6.0", default-features = false, features = ["std"] }
 serde = { version = "1.0.147", default-features = false, features = ["derive", "std"] }
 shlex = { version = "1.1.0", default-features = false, features = ["std"] }
 simple_logger = { version = "4.0.0", default-features = false, features = ["colors", "stderr"] }
-structopt = { version = "0.3.26", default-features = false, features = ["color"] }
 strum = { version = "0.24.1", default-features = false, features = ["derive", "std"] }
 tempfile = { version = "3.3.0", default-features = false }
 termsize = { version = "0.1.6", default-features = false }

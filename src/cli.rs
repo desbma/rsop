@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 #[structopt(version=env!("CARGO_PKG_VERSION"), about="Open or preview files.")]
 pub struct CommandLineOpts {
     pub path: Option<PathBuf>,
