@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.4.0 - 2023-11-20
+
+### Features
+
+- More general support for MIME prefix match
+- Update/improve advanced config
+
+### Miscellaneous Tasks
+
+- Move from structopt to clap
+- Version 1.4.0
+
 ## 1.3.1 - 2023-10-10
 
 ### Bug Fixes
