@@ -80,7 +80,7 @@ mimes = ["application/octet-stream"]
 mimes = ["application/x-bzip2"]
 
 [filetype.certificate]
-mimes = ["application/pkix-cert+pem"]
+mimes = ["application/pkix-cert"]
 
 [filetype.deb]
 mimes = ["application/vnd.debian.binary-package"]
@@ -89,7 +89,7 @@ mimes = ["application/vnd.debian.binary-package"]
 mimes = ["inode/directory"]
 
 [filetype.epub]
-mimes = ["application/epub+zip"]
+mimes = ["application/epub"]
 
 [filetype.guitar_tab]
 extensions = ["gp3", "gp4", "gp5", "ptb"]
@@ -103,7 +103,6 @@ mimes = ["text/html"]
 
 [filetype.image]
 mimes = ["image"]
-extensions = ["svg"]
 
 [filetype.jpeg]
 mimes = ["image/jpeg"]
@@ -119,11 +118,11 @@ extensions = ["mp.jpg"]
 
 [filetype.msdocument]
 extensions = ["doc", "docx", "pptx", "rtf", "xlsx"]
-mimes = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/rtf"]
+mimes = ["application/vnd.openxmlformats-officedocument", "text/rtf"]
 
 [filetype.opendocument]
 extensions = ["odg", "odp", "ods", "odt"]
-mimes = ["application/vnd.oasis.opendocument.spreadsheet", "application/vnd.oasis.opendocument.text"]
+mimes = ["application/vnd.oasis.opendocument"]
 
 [filetype.patch]
 mimes = ["text/x-patch"]
@@ -142,6 +141,10 @@ mimes = ["inode/socket"]
 
 [filetype.sqlite]
 mimes = ["application/vnd.sqlite3"]
+
+[filetype.svg]
+mimes = ["image/svg"]
+extensions = ["svg"]
 
 [filetype.text]
 mimes = [
@@ -208,7 +211,7 @@ shell = true
 stdin_arg = ""
 
 [handler_preview.archive]
-command = "bsdtar -tf %i | grep -v '/$' | head -n %l | tree -C --noreport --fromfile . | tail -n +2 | sed 's@^....@@'"
+command = "echo '🔍 MIME: %m'; bsdtar -tf %i | grep -v '/$' | tree -C --noreport --fromfile . | tail -n +2 | sed 's@^....@@' |  head -n $((%l - 3))"
 shell = true
 
 [handler_open.archive]
@@ -271,19 +274,19 @@ command = "chafa -s %cx%l %i"
 command = "imv %i"
 wait = false
 
+[handler_edit.image]
+command = "gimp %i"
+no_pipe = true
+
 [handler_preview.jpeg]
 command = "exiftran -a -o /dev/stdout %i | chafa -s %cx%l"
 shell = true
 stdin_arg = "/dev/stdin"
 
-[handler_open.jpeg]
-command = "imv %i"
-wait = false
-
 [handler_preview.markdown]
 command = "mdcat %i"
 
-[handler_open.markdown]
+[handler_edit.markdown]
 command = "retext %i"
 wait = false
 
@@ -295,7 +298,7 @@ no_pipe = true
 command = "pandoc -s -t markdown -- %i | mdcat"
 shell = true
 
-[handler_open.msdocument]
+[handler_edit.msdocument]
 command = "libreoffice %i"
 no_pipe = true
 
@@ -303,7 +306,7 @@ no_pipe = true
 command = "odt2txt %i"
 no_pipe = true
 
-[handler_open.opendocument]
+[handler_edit.opendocument]
 command = "libreoffice %i"
 no_pipe = true
 
@@ -332,7 +335,7 @@ command = "openscad -q --render --colorscheme=Solarized --imgsize=800,600 --expo
 shell = true
 no_pipe = true
 
-[handler_open.scad]
+[handler_edit.scad]
 command = "openscad %i"
 no_pipe = true
 
@@ -347,6 +350,13 @@ no_pipe = true
 [handler_open.sqlite]
 command = "sqlite3 %i .dump | bat --paging always --color=always -n --terminal-width %c -l sql"
 shell = true
+no_pipe = true
+
+[handler_preview.svg]
+command = "chafa -s %cx%l %i"
+
+[handler_open.svg]
+command = "firefox %i"
 no_pipe = true
 
 [handler_preview.text]

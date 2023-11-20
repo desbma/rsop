@@ -201,8 +201,8 @@ mod tests {
         assert!(res.is_ok());
         let config = res.unwrap();
 
-        assert_eq!(config.filetype.len(), 30);
-        assert_eq!(config.handler_preview.len(), 22);
+        assert_eq!(config.filetype.len(), 31);
+        assert_eq!(config.handler_preview.len(), 23);
         assert_eq!(
             config.default_handler_preview,
             FileHandler {
@@ -214,7 +214,7 @@ mod tests {
                 stdin_arg: Some("".to_string())
             }
         );
-        assert_eq!(config.handler_open.len(), 21);
+        assert_eq!(config.handler_open.len(), 17);
         assert_eq!(
             config.default_handler_open,
             FileHandler {
