@@ -294,11 +294,10 @@ impl HandlerMapping {
                     return self.run_path(handler, path, mode, Some(mime));
                 }
 
-                // Try "main" MIME type
-                let mime_main = mime.split('/').next();
-                if let Some(mime_main) = mime_main {
-                    if let Some(handler) = handlers.mimes.get(mime_main) {
-                        return self.run_path(handler, path, mode, Some(mime));
+                // Try sub MIME types
+                for sub_mime in Self::split_mime(mime) {
+                    if let Some(handler) = handlers.mimes.get(&sub_mime) {
+                        return self.run_path(handler, path, mode, Some(&sub_mime));
                     }
                 }
             }
@@ -828,6 +827,22 @@ impl HandlerMapping {
         }
         Ok(extensions)
     }
+
+    fn split_mime(s: &str) -> Vec<String> {
+        let mut r = vec![s.to_string()];
+        let mut base = s.to_string();
+        if let Some((a, _b)) = base.rsplit_once('+') {
+            r.push(a.to_string());
+            base = a.to_string();
+        }
+        for (dot_idx, _) in base.rmatch_indices('.') {
+            r.push(base[..dot_idx].to_string());
+        }
+        if let Some((a, _b)) = base.split_once('/') {
+            r.push(a.to_string());
+        }
+        r
+    }
 }
 
 #[cfg(test)]
@@ -917,6 +932,28 @@ mod tests {
         assert_eq!(
             HandlerMapping::path_extensions(Path::new("/tmp/foo.bar.baz.blah")).ok(),
             Some(vec!["baz.blah".to_string(), "blah".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_split_mime() {
+        assert_eq!(
+            HandlerMapping::split_mime("application/vnd.debian.binary-package"),
+            vec![
+                "application/vnd.debian.binary-package",
+                "application/vnd.debian",
+                "application/vnd",
+                "application"
+            ]
+        );
+
+        assert_eq!(
+            HandlerMapping::split_mime("application/pkix-cert+pem"),
+            vec![
+                "application/pkix-cert+pem",
+                "application/pkix-cert",
+                "application"
+            ]
         );
     }
 }

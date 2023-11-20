@@ -51,7 +51,7 @@
 # makes more sense to use a filter instead.
 #
 # - mimes
-# List of MIME types, the main type (part before the '/') can be used to match several subtypes.
+# List of MIME types, a prefix (part before the '+', '.' or '/') can be used to match several subtypes.
 # Compared to identification by extension this has the advantage of also working with data piped from stdin.
 #
 

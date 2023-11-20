@@ -13,7 +13,7 @@ If you spend most time in a terminal, and are unsatisfied by current solutions t
 ## Features
 
 - Start program to view/edit file according to extension or MIME type
-- Provides three commands (all symlinks to a single `rsop` binary):
+- Provides 4 commands (all symlinks to a single `rsop` binary):
   - `rso`: open file
   - `rse`: edit file (similar to `rso` in most cases, except when open to view or edit have a different handler)
   - `rsp`: preview files in terminal, to be used for example in terminal file managers or [`fzf`](https://github.com/junegunn/fzf) preview panel
