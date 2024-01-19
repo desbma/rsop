@@ -125,7 +125,7 @@ pa() {
 ## Performance
 
 `rsop` is quite fast. In practice it rarely matters because choosing with which program to open or preview files is usually so quick it is not perceptible. However performance can matter if for example you are decompressing a huge `tar.gz` archive to preview its content.
-To help with that, `rsop` uses the [`splice` system call](https://man7.org/linux/man-pages/man2/splice.2.html) if available on your platform. In the `.tar.gz` example this allows decompressing data with `gzip` or `pigz` and passing it to tar (or whatever you have configured to handle `application/x-tar` MIME type), **without wasting time to copy data in user space** between the two programs.
+To help with that, `rsop` uses the [`splice` system call](https://man7.org/linux/man-pages/man2/splice.2.html) if available on your platform. In the `.tar.gz` example this allows decompressing data with `gzip` or `pigz` and passing it to tar (or whatever you have configured to handle `application/x-tar` MIME type), **without wasting time to copy data in user space** between the two programs. This was previously done using a custom code path, but is now done [transparently](https://github.com/rust-lang/rust/pull/75272) by the standard library.
 
 Other stuff `rsop` does to remain quick:
 

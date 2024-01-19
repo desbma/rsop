@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-use std::io::copy;
-use std::io::{self, stdin, Read, Write};
+use std::io::{self, copy, stdin, Read, Write};
 use std::iter;
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdout, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 
 use crate::config;
@@ -102,26 +100,8 @@ pub enum HandlerError {
     Other(#[from] anyhow::Error),
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-lazy_static::lazy_static! {
-    // How many bytes to read from pipe to guess MIME type, use a full memory page
-    static ref PIPE_INITIAL_READ_LENGTH: usize =
-        nix::unistd::sysconf(nix::unistd::SysconfVar::PAGE_SIZE).expect("Unable to get page size").unwrap() as usize;
-}
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-lazy_static::lazy_static! {
-    static ref PIPE_INITIAL_READ_LENGTH: usize = 4096;
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-trait ReadPipe: Read + Send {}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-trait ReadPipe: Read + AsRawFd + Send {}
-
-impl ReadPipe for File {}
-
-impl ReadPipe for ChildStdout {}
+/// How many bytes to read from pipe to guess MIME type, use a full memory page
+const PIPE_INITIAL_READ_LENGTH: usize = 4096;
 
 impl HandlerMapping {
     pub fn new(cfg: &config::Config) -> anyhow::Result<HandlerMapping> {
@@ -312,7 +292,7 @@ impl HandlerMapping {
     #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_pipe<T>(&self, mut pipe: T, mode: &RsopMode) -> Result<(), HandlerError>
     where
-        T: ReadPipe,
+        T: Read + Send,
     {
         // Handler candidates
         let (handlers, next_handlers) = match mode {
@@ -326,9 +306,9 @@ impl HandlerMapping {
         // Read header
         log::trace!(
             "Using max header length of {} bytes",
-            *PIPE_INITIAL_READ_LENGTH
+            PIPE_INITIAL_READ_LENGTH
         );
-        let mut buffer: Vec<u8> = vec![0; *PIPE_INITIAL_READ_LENGTH];
+        let mut buffer: Vec<u8> = vec![0; PIPE_INITIAL_READ_LENGTH];
         let header_len = pipe.read(&mut buffer)?;
         let header = &buffer[0..header_len];
 
@@ -532,7 +512,7 @@ impl HandlerMapping {
         mode: &RsopMode,
     ) -> Result<(), HandlerError>
     where
-        T: ReadPipe,
+        T: Read + Send,
     {
         let term_size = Self::term_size();
 
@@ -623,7 +603,7 @@ impl HandlerMapping {
         term_size: &termsize::Size,
     ) -> Result<(), HandlerError>
     where
-        T: ReadPipe,
+        T: Read,
     {
         // Write to a temporary file if handler does not support reading from stdin
         let input = if handler.no_pipe {
@@ -703,14 +683,11 @@ impl HandlerMapping {
         // Unfortunately, stdin is buffered, and there is no clean way to get it
         // unbuffered to read only what we want for the header, so use fd hack to get an unbuffered reader
         // see https://users.rust-lang.org/t/add-unbuffered-rawstdin-rawstdout/26013
-        // On plaforms other than linux we don't care about buffering because we use chunk copy instead of splice
         let stdin = stdin();
         let reader = unsafe { File::from_raw_fd(stdin.as_raw_fd()) };
         Ok(reader)
     }
 
-    // Default chunk copy using stdlib's std::io::copy when splice syscall is not available
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
     fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<usize>
     where
         S: Read,
@@ -728,49 +705,9 @@ impl HandlerMapping {
         Ok(header.len() + copied)
     }
 
-    // Efficient 0-copy implementation using splice
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    fn pipe_forward<S, D>(src: &mut S, dst: &mut D, header: &[u8]) -> anyhow::Result<usize>
-    where
-        S: AsRawFd,
-        D: AsRawFd + Write,
-    {
-        dst.write_all(header)?;
-        log::trace!("Header written ({} bytes)", header.len());
-
-        let mut c = 0;
-        const SPLICE_LEN: usize = 2usize.pow(62); // splice returns -EINVAL for pipe to file with usize::MAX len
-        const SPLICE_FLAGS: nix::fcntl::SpliceFFlags = nix::fcntl::SpliceFFlags::empty();
-
-        loop {
-            let rc = nix::fcntl::splice(
-                src.as_raw_fd(),
-                None,
-                dst.as_raw_fd(),
-                None,
-                SPLICE_LEN,
-                SPLICE_FLAGS,
-            );
-            let moved = match rc {
-                Err(nix::errno::Errno::EPIPE) => 0,
-                Err(e) => return Err(anyhow::Error::new(e)),
-                Ok(m) => m,
-            };
-            log::trace!("moved = {}", moved);
-            if moved == 0 {
-                break;
-            }
-            c += moved;
-        }
-
-        log::trace!("Pipe exhausted, moved {} bytes total", header.len() + c);
-
-        Ok(header.len() + c)
-    }
-
     fn pipe_to_tmpfile<T>(header: &[u8], mut pipe: T) -> anyhow::Result<tempfile::NamedTempFile>
     where
-        T: ReadPipe,
+        T: Read,
     {
         let mut tmp_file = tempfile::Builder::new()
             .prefix(const_format::concatcp!(env!("CARGO_PKG_NAME"), '_'))
