@@ -29,7 +29,6 @@
 # - retext  https://github.com/retext-project/retext
 # - sqlite3  https://www.sqlite.org/index.html
 # - ss  https://git.kernel.org/pub/scm/network/iproute2/iproute2.git
-# - subl  https://www.sublimetext.com/
 # - transmission-remote-gtk  https://github.com/transmission-remote-gtk/transmission-remote-gtk
 # - transmission-show  https://transmissionbt.com/
 # - tree  http://mama.indstate.edu/users/ice/tree/
@@ -67,7 +66,7 @@ mimes = [
     "application/zip"
 ]
 # bsdtar can decompress transparently
-extensions = ["tar.bz2", "tar.gz", "tar.xz", "tar.zst"]
+extensions = ["iso", "tar.bz2", "tar.gz", "tar.xz", "tar.zst"]
 
 [filetype.audio]
 mimes = ["audio"]
@@ -83,6 +82,7 @@ mimes = ["application/x-bzip2"]
 mimes = ["application/pkix-cert"]
 
 [filetype.deb]
+extensions = ["deb"]
 mimes = ["application/vnd.debian.binary-package"]
 
 [filetype.directory]
@@ -162,7 +162,7 @@ mimes = ["application/x-bittorrent"]
 
 [filetype.video]
 mimes = ["video", "application/vnd.ms-asf", "application/x-matroska", "application/x-riff"]
-extensions = ["avi", "ogv"]
+extensions = ["avi", "mp4", "ogv"]
 
 [filetype.xsv]
 extensions = ["csv", "tsv"]
@@ -363,7 +363,7 @@ no_pipe = true
 command = "bat -P --color=always -n --terminal-width %c -r :%l %i"
 
 [handler_open.text]
-command = "subl %i"
+command = "bat --paging always --color=always -n --terminal-width %c %i"
 
 [handler_preview.torrent]
 command = "transmission-show -- %i"
