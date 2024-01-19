@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.4.1 - 2024-01-19
+
+### Bug Fixes
+
+- Mime iteration for piped data
+- Try alternate mode handlers when piped too
+
+### Features
+
+- Update advanced config
+
+### Miscellaneous Tasks
+
+- Version 1.4.1
+
 ## 1.4.0 - 2023-11-20
 
 ### Features
