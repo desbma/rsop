@@ -315,10 +315,13 @@ impl HandlerMapping {
         T: ReadPipe,
     {
         // Handler candidates
-        let handlers = match mode {
-            RsopMode::Preview => &self.handlers_preview,
-            RsopMode::Open | _ => &self.handlers_open,
+        let (handlers, next_handlers) = match mode {
+            RsopMode::Preview => (&self.handlers_preview, None),
+            RsopMode::Edit => (&self.handlers_edit, Some(&self.handlers_open)),
+            RsopMode::Open | _ => (&self.handlers_open, Some(&self.handlers_edit)),
         };
+
+        let handlers_it = iter::once(handlers).chain(next_handlers);
 
         // Read header
         log::trace!(
@@ -336,11 +339,13 @@ impl HandlerMapping {
             return Ok(());
         }
 
-        // Try sub MIME types
-        for sub_mime in Self::split_mime(mime) {
-            log::trace!("Trying MIME {sub_mime:?}");
-            if let Some(handler) = handlers.mimes.get(&sub_mime) {
-                return self.run_pipe(handler, header, pipe, Some(&sub_mime), mode);
+        for handlers in handlers_it {
+            // Try sub MIME types
+            for sub_mime in Self::split_mime(mime) {
+                log::trace!("Trying MIME {sub_mime:?}");
+                if let Some(handler) = handlers.mimes.get(&sub_mime) {
+                    return self.run_pipe(handler, header, pipe, Some(&sub_mime), mode);
+                }
             }
         }
 
