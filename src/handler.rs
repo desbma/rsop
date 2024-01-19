@@ -290,12 +290,9 @@ impl HandlerMapping {
             }
 
             if let Some(mime) = mime {
-                if let Some(handler) = handlers.mimes.get(mime) {
-                    return self.run_path(handler, path, mode, Some(mime));
-                }
-
                 // Try sub MIME types
                 for sub_mime in Self::split_mime(mime) {
+                    log::trace!("Trying MIME {sub_mime:?}");
                     if let Some(handler) = handlers.mimes.get(&sub_mime) {
                         return self.run_path(handler, path, mode, Some(&sub_mime));
                     }
@@ -339,15 +336,11 @@ impl HandlerMapping {
             return Ok(());
         }
 
-        if let Some(handler) = handlers.mimes.get(mime) {
-            return self.run_pipe(handler, header, pipe, Some(mime), mode);
-        }
-
-        // Try "main" MIME type
-        let mime_main = mime.split('/').next();
-        if let Some(mime_main) = mime_main {
-            if let Some(handler) = handlers.mimes.get(mime_main) {
-                return self.run_pipe(handler, header, pipe, Some(mime), mode);
+        // Try sub MIME types
+        for sub_mime in Self::split_mime(mime) {
+            log::trace!("Trying MIME {sub_mime:?}");
+            if let Some(handler) = handlers.mimes.get(&sub_mime) {
+                return self.run_pipe(handler, header, pipe, Some(&sub_mime), mode);
             }
         }
 
