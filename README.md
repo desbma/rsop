@@ -1,7 +1,7 @@
 # rsop
 
 [![Build status](https://github.com/desbma/rsop/actions/workflows/ci.yml/badge.svg)](https://github.com/desbma/rsop/actions)
-[![AUR version](https://img.shields.io/aur/version/rsop.svg?style=flat)](https://aur.archlinux.org/packages/rsop/)
+[![AUR version](https://img.shields.io/aur/version/rsop-open.svg?style=flat)](https://aur.archlinux.org/packages/rsop-open/)
 [![License](https://img.shields.io/github/license/desbma/rsop.svg?style=flat)](https://github.com/desbma/rsop/blob/master/LICENSE)
 
 Simple, fast & configurable tool to open and preview files.
@@ -51,7 +51,7 @@ ln -rsv /usr/local/bin/{rsop,xdg-open}
 
 ### From the AUR
 
-Arch Linux users can install the [rsop AUR package](https://aur.archlinux.org/packages/rsop/).
+Arch Linux users can install the [rsop-open AUR package](https://aur.archlinux.org/packages/rsop-open/).
 
 ## Configuration
 
@@ -72,7 +72,7 @@ In `rifle.conf`:
 In `scope.sh`:
 
     #!/bin/sh
-    RSOP_MODE=preview COLUMNS="$2" LINES="$3" exec rsop "$1"
+    COLUMNS="$2" LINES="$3" exec rsp "$1"
 
 Dont forget to make it executable with `chmod +x ~/.config/ranger/scope.sh`.
 
@@ -91,7 +91,7 @@ Add in `lfrc`:
 And create `~/.config/lf/preview` with:
 
     #!/bin/sh
-    RSOP_MODE=preview COLUMNS="$2" LINES="$3" exec rsop "$1"
+    COLUMNS="$2" LINES="$3" exec rsp "$1"
 
 ## Show me some cool stuff `rsop` can do
 
