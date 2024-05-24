@@ -352,7 +352,7 @@ impl HandlerMapping {
     }
 
     // Substitute % prefixed patterns in string
-    fn substitute(s: &str, path: &Path, mime: Option<&str>, term_size: &termsize::Size) -> String {
+    fn substitute(s: &str, path: &Path, mime: Option<&str>, term_size: &(u16, u16)) -> String {
         let mut r = s.to_string();
 
         let mut path_arg = path
@@ -368,13 +368,13 @@ impl HandlerMapping {
         const BASE_SUBST_UNESCAPE_DST: &str = "%";
         let mut subst_params: Vec<(String, &str, &str, &str)> = vec![
             (
-                format!("{}", term_size.cols),
+                format!("{}", term_size.0),
                 const_format::str_replace!(BASE_SUBST_REGEX, "{}", "c"),
                 const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'c'),
                 const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'c'),
             ),
             (
-                format!("{}", term_size.rows),
+                format!("{}", term_size.1),
                 const_format::str_replace!(BASE_SUBST_REGEX, "{}", "l"),
                 const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'l'),
                 const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'l'),
@@ -404,25 +404,22 @@ impl HandlerMapping {
     }
 
     // Get terminal size by probing it, reading it from env, or using fallback
-    fn term_size() -> termsize::Size {
-        match termsize::get() {
-            Some(s) => s,
-            None => {
-                let cols_env = env::var("FZF_PREVIEW_COLUMNS")
-                    .ok()
-                    .and_then(|v| v.parse::<u16>().ok())
-                    .or_else(|| env::var("COLUMNS").ok().and_then(|v| v.parse::<u16>().ok()));
-                let rows_env = env::var("FZF_PREVIEW_LINES")
-                    .ok()
-                    .and_then(|v| v.parse::<u16>().ok())
-                    .or_else(|| env::var("LINES").ok().and_then(|v| v.parse::<u16>().ok()));
-                if let (Some(cols), Some(rows)) = (cols_env, rows_env) {
-                    termsize::Size { rows, cols }
-                } else {
-                    termsize::Size { rows: 24, cols: 80 }
-                }
+    fn term_size() -> (u16, u16) {
+        termion::terminal_size().unwrap_or_else(|_| {
+            let cols_env = env::var("FZF_PREVIEW_COLUMNS")
+                .ok()
+                .and_then(|v| v.parse::<u16>().ok())
+                .or_else(|| env::var("COLUMNS").ok().and_then(|v| v.parse::<u16>().ok()));
+            let rows_env = env::var("FZF_PREVIEW_LINES")
+                .ok()
+                .and_then(|v| v.parse::<u16>().ok())
+                .or_else(|| env::var("LINES").ok().and_then(|v| v.parse::<u16>().ok()));
+            if let (Some(cols), Some(rows)) = (cols_env, rows_env) {
+                (cols, rows)
+            } else {
+                (80, 24)
             }
-        }
+        })
     }
 
     fn run_path(
@@ -453,7 +450,7 @@ impl HandlerMapping {
         filter: &FileFilter,
         path: &Path,
         mime: Option<&str>,
-        term_size: &termsize::Size,
+        term_size: &(u16, u16),
     ) -> Result<Child, HandlerError> {
         let cmd = Self::substitute(&filter.command, path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
@@ -475,7 +472,7 @@ impl HandlerMapping {
         handler: &FileHandler,
         path: &Path,
         mime: Option<&str>,
-        term_size: &termsize::Size,
+        term_size: &(u16, u16),
     ) -> Result<(), HandlerError> {
         let cmd = Self::substitute(&handler.command, path, mime, term_size);
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
@@ -563,7 +560,7 @@ impl HandlerMapping {
         filter: &FileFilter,
         mime: Option<&str>,
         tmp_file: Option<&tempfile::NamedTempFile>,
-        term_size: &termsize::Size,
+        term_size: &(u16, u16),
     ) -> Result<Child, HandlerError> {
         // Build command
         let path = if let Some(tmp_file) = tmp_file {
@@ -600,7 +597,7 @@ impl HandlerMapping {
         header: &[u8],
         pipe: T,
         mime: Option<&str>,
-        term_size: &termsize::Size,
+        term_size: &(u16, u16),
     ) -> Result<(), HandlerError>
     where
         T: Read,
@@ -825,7 +822,7 @@ mod tests {
 
     #[test]
     fn test_substitute() {
-        let term_size = termsize::Size { rows: 84, cols: 85 };
+        let term_size = (85, 84);
         let path = Path::new("");
 
         assert_eq!(
