@@ -360,7 +360,7 @@ impl HandlerMapping {
             .unwrap_or_else(|| panic!("Invalid path {:?}", path))
             .to_string();
         if !path_arg.is_empty() {
-            path_arg = shlex::quote(&path_arg).to_string();
+            path_arg = shlex::try_quote(&path_arg).unwrap().to_string();
         }
 
         const BASE_SUBST_REGEX: &str = "([^%])(%{})";
