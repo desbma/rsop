@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.4.2 - 2024-06-07
+
+### Bug Fixes
+
+- Replace buggy/abandoned term size crate
+- Shlex deprecation warning
+
+### Documentation
+
+- Rename AUR package
+
+### Miscellaneous Tasks
+
+- Version 1.4.2
+
+### Refactor
+
+- Remove dedicated splice code path
+
 ## 1.4.1 - 2024-01-19
 
 ### Bug Fixes
