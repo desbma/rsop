@@ -13,7 +13,6 @@ anyhow = { version = "1.0.66", default-features = false, features = ["backtrace"
 clap = { version = "4.4.7", default-features = false, features = ["std", "color", "help", "usage", "error-context", "suggestions", "derive"] }
 const_format = { version = "0.2.30", default-features = false, features = ["const_generics"] }
 crossbeam-utils = { version = "0.8.12", default-features = false, features = ["std"] }
-lazy_static = { version = "1.4.0", default-features = false }
 log = { version = "0.4.17", default-features = false, features = ["max_level_trace", "release_max_level_info"] }
 regex = { version = "1.6.0", default-features = false, features = ["std"] }
 serde = { version = "1.0.147", default-features = false, features = ["derive", "std"] }

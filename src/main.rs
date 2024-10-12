@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use anyhow::Context;
 use clap::Parser;
@@ -25,17 +26,15 @@ pub enum RsopMode {
     Identify,
 }
 
-lazy_static::lazy_static! {
-    static ref BIN_NAME_TO_MODE: BTreeMap<&'static str, RsopMode> = {
-        let mut m = BTreeMap::new();
-        m.insert("rsp", RsopMode::Preview);
-        m.insert("rso", RsopMode::Open);
-        m.insert("xdg-open", RsopMode::XdgOpen);
-        m.insert("rse", RsopMode::Edit);
-        m.insert("rsi", RsopMode::Identify);
-        m
-    };
-}
+static BIN_NAME_TO_MODE: LazyLock<BTreeMap<&'static str, RsopMode>> = LazyLock::new(|| {
+    BTreeMap::from([
+        ("rsp", RsopMode::Preview),
+        ("rso", RsopMode::Open),
+        ("xdg-open", RsopMode::XdgOpen),
+        ("rse", RsopMode::Edit),
+        ("rsi", RsopMode::Identify),
+    ])
+});
 
 fn runtime_mode() -> RsopMode {
     // Get from env var
