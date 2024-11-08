@@ -227,18 +227,16 @@ impl HandlerMapping {
 
     #[allow(clippy::wildcard_in_or_patterns)]
     fn dispatch_path(&self, path: &Path, mode: &RsopMode) -> Result<(), HandlerError> {
-        // Handler candidates
+        // Handler candidates, with fallbacks
         let (handlers, next_handlers) = match mode {
             RsopMode::Preview => (&self.handlers_preview, None),
             RsopMode::Edit => (&self.handlers_edit, Some(&self.handlers_open)),
             RsopMode::Open | _ => (&self.handlers_open, Some(&self.handlers_edit)),
         };
 
-        let handlers_it = iter::once(handlers).chain(next_handlers);
-        let mut mime = None;
-
-        for handlers in handlers_it {
-            if *mode != RsopMode::Identify {
+        // Try by extension first
+        if *mode != RsopMode::Identify {
+            for handlers in iter::once(handlers).chain(next_handlers) {
                 for extension in Self::path_extensions(path)? {
                     if let Some(handler) = handlers.extensions.get(&extension) {
                         let mime = if handler.has_pattern('m') {
@@ -254,21 +252,22 @@ impl HandlerMapping {
                     }
                 }
             }
+        }
 
-            if mime.is_none() {
-                mime = Self::path_mime(path).map_err(|e| HandlerError::Input {
-                    err: e,
-                    path: path.to_owned(),
-                })?;
-            }
-            if let RsopMode::Identify = mode {
-                println!(
-                    "{}",
-                    mime.ok_or_else(|| anyhow::anyhow!("Unable to get MIME type for {:?}", path))?
-                );
-                return Ok(());
-            }
+        let mime = Self::path_mime(path).map_err(|e| HandlerError::Input {
+            err: e,
+            path: path.to_owned(),
+        })?;
+        if let RsopMode::Identify = mode {
+            println!(
+                "{}",
+                mime.ok_or_else(|| anyhow::anyhow!("Unable to get MIME type for {:?}", path))?
+            );
+            return Ok(());
+        }
 
+        // Match by MIME
+        for handlers in iter::once(handlers).chain(next_handlers) {
             if let Some(mime) = mime {
                 // Try sub MIME types
                 for sub_mime in Self::split_mime(mime) {
