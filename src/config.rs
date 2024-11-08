@@ -1,10 +1,12 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, serde::Deserialize)]
-pub struct Filetype {
+pub(crate) struct Filetype {
     #[serde(default)]
     pub extensions: Vec<String>,
 
@@ -13,7 +15,7 @@ pub struct Filetype {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize)]
-pub struct FileHandler {
+pub(crate) struct FileHandler {
     pub command: String,
     #[serde(default = "default_file_handler_wait")]
     pub wait: bool,
@@ -29,7 +31,7 @@ const fn default_file_handler_wait() -> bool {
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
-pub struct FileFilter {
+pub(crate) struct FileFilter {
     pub command: String,
     #[serde(default)]
     pub shell: bool,
@@ -39,14 +41,14 @@ pub struct FileFilter {
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
-pub struct SchemeHandler {
+pub(crate) struct SchemeHandler {
     pub command: String,
     #[serde(default)]
     pub shell: bool,
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct Config {
+pub(crate) struct Config {
     #[serde(default)]
     pub filetype: HashMap<String, Filetype>,
 
@@ -68,7 +70,7 @@ pub struct Config {
     pub handler_scheme: HashMap<String, SchemeHandler>,
 }
 
-pub fn parse_config() -> anyhow::Result<Config> {
+pub(crate) fn parse_config() -> anyhow::Result<Config> {
     parse_config_path(&get_config_path()?)
 }
 
@@ -77,15 +79,14 @@ fn get_config_path() -> anyhow::Result<PathBuf> {
     const DEFAULT_CONFIG_STR: &str = include_str!("../config/config.toml.default");
     let binary_name = env!("CARGO_PKG_NAME");
     let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
-    let config_filepath = match xdg_dirs.find_config_file(CONFIG_FILENAME) {
-        Some(p) => p,
-        None => {
-            let path = xdg_dirs.place_config_file(CONFIG_FILENAME)?;
-            log::warn!("No config file found, creating a default one in {:?}", path);
-            let mut file = File::create(&path)?;
-            file.write_all(DEFAULT_CONFIG_STR.as_bytes())?;
-            path
-        }
+    let config_filepath = if let Some(p) = xdg_dirs.find_config_file(CONFIG_FILENAME) {
+        p
+    } else {
+        let path = xdg_dirs.place_config_file(CONFIG_FILENAME)?;
+        log::warn!("No config file found, creating a default one in {:?}", path);
+        let mut file = File::create(&path)?;
+        file.write_all(DEFAULT_CONFIG_STR.as_bytes())?;
+        path
     };
 
     log::debug!("Config filepath: {:?}", config_filepath);
@@ -130,7 +131,7 @@ mod tests {
         assert_eq!(
             config.default_handler_preview,
             FileHandler {
-                command: "file %i".to_string(),
+                command: "file %i".to_owned(),
                 wait: true,
                 shell: false,
                 no_pipe: false,
@@ -141,7 +142,7 @@ mod tests {
         assert_eq!(
             config.default_handler_open,
             FileHandler {
-                command: "cat -A %i".to_string(),
+                command: "cat -A %i".to_owned(),
                 wait: true,
                 shell: false,
                 no_pipe: false,
@@ -168,7 +169,7 @@ mod tests {
         assert_eq!(
             config.default_handler_preview,
             FileHandler {
-                command: "file %i".to_string(),
+                command: "file %i".to_owned(),
                 wait: true,
                 shell: false,
                 no_pipe: false,
@@ -179,7 +180,7 @@ mod tests {
         assert_eq!(
             config.default_handler_open,
             FileHandler {
-                command: "cat -A %i".to_string(),
+                command: "cat -A %i".to_owned(),
                 wait: true,
                 shell: false,
                 no_pipe: false,
@@ -207,22 +208,22 @@ mod tests {
             config.default_handler_preview,
             FileHandler {
                 command: "echo '🔍 MIME: %m'; hexyl --border none %i | head -n $((%l - 1))"
-                    .to_string(),
+                    .to_owned(),
                 wait: true,
                 shell: true,
                 no_pipe: false,
-                stdin_arg: Some("".to_string())
+                stdin_arg: Some(String::new())
             }
         );
         assert_eq!(config.handler_open.len(), 17);
         assert_eq!(
             config.default_handler_open,
             FileHandler {
-                command: "hexyl %i | less -R".to_string(),
+                command: "hexyl %i | less -R".to_owned(),
                 wait: true,
                 shell: true,
                 no_pipe: false,
-                stdin_arg: Some("".to_string())
+                stdin_arg: Some(String::new())
             }
         );
         assert_eq!(config.filter.len(), 5);
