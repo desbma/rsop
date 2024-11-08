@@ -62,6 +62,7 @@ mimes = [
     "application/x-archive",
     "application/x-cpio",
     "application/x-rar",
+    "application/x-rpm",
     "application/x-tar",
     "application/zip"
 ]
@@ -69,8 +70,8 @@ mimes = [
 extensions = ["iso", "tar.bz2", "tar.gz", "tar.xz", "tar.zst"]
 
 [filetype.audio]
-mimes = ["audio"]
-extensions = ["m4a"]
+mimes = ["audio", "video/ogg"]
+extensions = ["m4a", "ogg"]
 
 [filetype.binary]
 mimes = ["application/octet-stream"]
@@ -88,8 +89,22 @@ mimes = ["application/vnd.debian.binary-package"]
 [filetype.directory]
 mimes = ["inode/directory"]
 
+[filetype.dot]
+extensions = ["dot"]
+mimes = ["text/vnd.graphviz"]
+
+[filetype.drawio]
+extensions = ["drawio"]
+
 [filetype.epub]
 mimes = ["application/epub"]
+
+[filetype.gif]
+extensions = ["gif"]
+mimes = ["image/gif"]
+
+[filetype.graph]
+extensions = ["graph"]
 
 [filetype.guitar_tab]
 extensions = ["gp3", "gp4", "gp5", "ptb"]
@@ -126,6 +141,7 @@ mimes = ["application/vnd.oasis.opendocument"]
 
 [filetype.patch]
 mimes = ["text/x-patch"]
+extensions = ["patch"]
 
 [filetype.pcap]
 mimes = ["application/vnd.tcpdump.pcap", "application/x-pcapng"]
@@ -149,7 +165,9 @@ extensions = ["svg"]
 [filetype.text]
 mimes = [
     "text",
+    "application/mbox",
     "application/pkcs8+pem",
+    "application/x-desktop",
     "application/x-perl",
     "application/x-php",
     "application/x-shellscript",
@@ -162,7 +180,7 @@ mimes = ["application/x-bittorrent"]
 
 [filetype.video]
 mimes = ["video", "application/vnd.ms-asf", "application/x-matroska", "application/x-riff"]
-extensions = ["avi", "mp4", "ogv"]
+extensions = ["3gp", "avi", "mp4", "ogv"]
 
 [filetype.xsv]
 extensions = ["csv", "tsv"]
@@ -215,7 +233,7 @@ command = "echo '🔍 MIME: %m'; bsdtar -tf %i | grep -v '/$' | tree -C --norepo
 shell = true
 
 [handler_open.archive]
-command = "bsdtar -tf %i | grep -v /$ | fzf -m --preview='bsdtar -xOf %i {} | rsp' --print0 | xargs -0r bsdtar -xOf %i | ifne rso"
+command = "bsdtar -tf %i | grep -v /$ | fzf -m --preview=\"bsdtar -xOf %i {} | rsp\" --print0 | xargs -0r bsdtar -xOf %i | ifne rso"
 shell = true
 no_pipe = true
 
@@ -251,9 +269,36 @@ shell = true
 command = "lsd -alFh --tree --color=always --icon=always %i | less -R"
 shell = true
 
+[handler_preview.dot]
+command = "dot -Tdot %i | graph-easy --as=boxart 2> /dev/null"
+shell = true
+stdin_arg = ""
+
+[handler_open.dot]
+command = "dot -Tsvg %i | rso"
+shell = true
+stdin_arg = ""
+
+[handler_edit.drawio]
+command = "drawio %i"
+no_pipe = true
+
 [handler_open.epub]
 command = "atril %i"
 no_pipe = true
+
+[handler_open.gif]
+command = "mpv --loop %i"
+wait = false
+
+[handler_preview.graph]
+command = "graph-easy --as=boxart %i"
+stdin_arg = ""
+
+[handler_open.graph]
+command = "graph-easy --as=dot %i | dot -Tsvg | rso"
+stdin_arg = ""
+shell = true
 
 [handler_open.guitar_tab]
 command = "tuxguitar %i"
