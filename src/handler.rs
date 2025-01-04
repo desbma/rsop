@@ -379,7 +379,7 @@ impl HandlerMapping {
             .to_owned();
         if !path_arg.is_empty() {
             path_arg = shlex::try_quote(&path_arg)
-                .context(format!("Failed to quote string {path_arg:?}"))?
+                .with_context(|| format!("Failed to quote string {path_arg:?}"))?
                 .to_string();
         }
 

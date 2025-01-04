@@ -39,7 +39,7 @@ fn runtime_mode() -> anyhow::Result<RsopMode> {
     let env_mode = env::var("RSOP_MODE");
     if let Ok(env_mode) = env_mode {
         return RsopMode::from_str(&env_mode)
-            .context(format!("Unexpected value for RSOP_MODE: {env_mode:?}"));
+            .with_context(|| format!("Unexpected value for RSOP_MODE: {env_mode:?}"));
     }
 
     // Get from binary name (env::current_exe() follows symbolic links, so don't use it)
