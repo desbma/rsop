@@ -6,7 +6,7 @@
 
 Simple, fast & configurable tool to open and preview files.
 
-Ideal for use with terminal file managers (ranger, lf, nnn, etc.). Can also be used as a general alternative to `xdg-open` and its various clones.
+Ideal for use with terminal file managers (ranger, lf, nnn, yazi, etc.). Can also be used as a general alternative to `xdg-open` and its various clones.
 
 If you spend most time in a terminal, and are unsatisfied by current solutions to associate file types with handler programs, this tool may be for you.
 
@@ -61,7 +61,7 @@ See comments and example in that file to set up file types and handlers for your
 
 A more advanced example configuration file is also available [here](./config/config.toml.advanced).
 
-### Usage with ranger
+### Usage with [ranger](https://github.com/ranger/ranger)
 
 **Warning: because ranger is built on Python's old ncurses version, the preview panel only supports 8bit colors (see https://github.com/ranger/ranger/issues/690#issuecomment-255590479), so if the output seems wrong you may need to tweak handlers to generate 8bit colors instead of 24.**
 
@@ -76,7 +76,7 @@ In `scope.sh`:
 
 Dont forget to make it executable with `chmod +x ~/.config/ranger/scope.sh`.
 
-### Usage with lf
+### Usage with [lf](https://github.com/gokcehan/lf)
 
 Add in `lfrc`:
 
@@ -92,6 +92,104 @@ And create `~/.config/lf/preview` with:
 
     #!/bin/sh
     COLUMNS="$2" LINES="$3" exec rsp "$1"
+
+## Usage with [yazi](https://github.com/sxyazi/yazi)
+
+Yazi has a complex LUA plugin system. Some built in previewers are superior to what `rsp` can provide (integrated image preview, seeking...), however in most cases `rsop` is more powerful and flexible, so this configuration mixes both built-in previewers and calls to `rsp`. Keep in mind the Yazi plugin API is not yet stable so this can break and requires changing frequently.
+
+<details>
+    <summary>~/.config/yazi/yazi.toml</summary>
+
+```yaml
+[plugin]
+previewers = [
+  { name = "*/", run = "folder" },
+  { mime = "image/{avif,hei?,jxl,svg+xml}", run = "magick" },
+  { mime = "image/*", run = "image" },
+  { mime = "font/*", run = "font" },
+  { mime = "application/vnd.ms-opentype", run = "font" },
+  { mime = "application/pdf", run = "pdf" },
+  { mime = "video/*", run = "video" },
+  { mime = "inode/empty", run = "empty" },
+  { name = "*", run = "rsp" },
+]
+
+[opener]
+open = [
+  { run = 'rso "$1"', desc = "Open", block = true },
+]
+edit = [
+  { run = 'rse "$1"', desc = "Edit" },
+]
+edit_block = [
+  { run = 'rse "$1"', desc = "Edit (blocking)", block = true },
+]
+
+[open]
+rules = [
+  { mime = "application/{,g}zip", use = [ "open", "extract" ] },
+  { mime = "application/{tar,bzip*,7z*,xz,rar}", use = [ "open", "extract" ] },
+  { mime = "text/*", use = [ "open", "edit_block" ] },
+  { name = "*", use = [ "open", "edit", "edit_block" ] },
+]
+```
+
+</details>
+
+<details>
+    <summary>~/.config/yazi/plugins/rsop/main.lua</summary>
+
+```lua
+local M = {}
+
+function M:peek(job)
+    local child = Command("rsp")
+        :args({
+            tostring(job.file.url),
+        })
+        :env("COLUMNS", tostring(job.area.w))
+        :env("LINES", tostring(job.area.h))
+        :stdout(Command.PIPED)
+        :stderr(Command.PIPED)
+        :spawn()
+
+    if not child then
+        return require("code").peek(job)
+    end
+
+    local limit = job.area.h
+    local i, lines = 0, ""
+    repeat
+        local next, event = child:read_line()
+        if event == 1 then
+            return require("code").peek(job)
+        elseif event ~= 0 then
+            break
+        end
+
+        i = i + 1
+        if i > job.skip then
+            lines = lines .. next
+        end
+    until i >= job.skip + limit
+
+    child:start_kill()
+    if job.skip > 0 and i < job.skip + limit then
+        ya.emit("peek", { math.max(0, i - limit), only_if = job.file.url, upper_bound = true })
+    else
+        lines = lines:gsub("\t", string.rep(" ", rt.preview.tab_size))
+        ya.preview_widgets(job, {
+            ui.Text.parse(lines):area(job.area):wrap(rt.preview.wrap == "yes" and ui.Text.WRAP or ui.Text.WRAP_NO),
+        })
+    end
+end
+
+function M:seek(job) require("code"):seek(job) end
+
+return M
+```
+
+</details>
 
 ## Show me some cool stuff `rsop` can do
 
