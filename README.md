@@ -61,41 +61,11 @@ See comments and example in that file to set up file types and handlers for your
 
 A more advanced example configuration file is also available [here](./config/config.toml.advanced).
 
-### Usage with [ranger](https://github.com/ranger/ranger)
-
-**Warning: because ranger is built on Python's old ncurses version, the preview panel only supports 8bit colors (see https://github.com/ranger/ranger/issues/690#issuecomment-255590479), so if the output seems wrong you may need to tweak handlers to generate 8bit colors instead of 24.**
-
-In `rifle.conf`:
-
-    = rso "$@"
-
-In `scope.sh`:
-
-    #!/bin/sh
-    COLUMNS="$2" LINES="$3" exec rsp "$1"
-
-Dont forget to make it executable with `chmod +x ~/.config/ranger/scope.sh`.
-
-### Usage with [lf](https://github.com/gokcehan/lf)
-
-Add in `lfrc`:
-
-    set filesep "\n"
-    set ifs "\n"
-    set previewer ~/.config/lf/preview
-    cmd open ${{
-       for f in ${fx[@]}; do rso "${f}"; done
-       lf -remote "send $id redraw"
-    }}
-
-And create `~/.config/lf/preview` with:
-
-    #!/bin/sh
-    COLUMNS="$2" LINES="$3" exec rsp "$1"
-
-## Usage with [yazi](https://github.com/sxyazi/yazi)
+### Usage with [yazi](https://github.com/sxyazi/yazi)
 
 Yazi has a complex LUA plugin system. Some built in previewers are superior to what `rsp` can provide (integrated image preview, seeking...), however in most cases `rsop` is more powerful and flexible, so this configuration mixes both built-in previewers and calls to `rsp`. Keep in mind the Yazi plugin API is not yet stable so this can break and requires changing frequently.
+
+**This requires yazi v25.5.28 or later, and the [piper plugin](https://github.com/yazi-rs/plugins/tree/main/piper.yazi).**
 
 <details>
     <summary>~/.config/yazi/yazi.toml</summary>
@@ -111,7 +81,7 @@ previewers = [
   { mime = "application/pdf", run = "pdf" },
   { mime = "video/*", run = "video" },
   { mime = "inode/empty", run = "empty" },
-  { name = "*", run = "rsp" },
+  { name = "*", run = 'piper -- sh -c "COLUMNS=$w LINES=$h rsp \"$1\""' },
 ]
 
 [opener]
@@ -136,60 +106,37 @@ rules = [
 
 </details>
 
-<details>
-    <summary>~/.config/yazi/plugins/rsop/main.lua</summary>
+### Usage with [lf](https://github.com/gokcehan/lf)
 
-```lua
-local M = {}
+Add in `lfrc`:
 
-function M:peek(job)
-    local child = Command("rsp")
-        :args({
-            tostring(job.file.url),
-        })
-        :env("COLUMNS", tostring(job.area.w))
-        :env("LINES", tostring(job.area.h))
-        :stdout(Command.PIPED)
-        :stderr(Command.PIPED)
-        :spawn()
+    set filesep "\n"
+    set ifs "\n"
+    set previewer ~/.config/lf/preview
+    cmd open ${{
+       for f in ${fx[@]}; do rso "${f}"; done
+       lf -remote "send $id redraw"
+    }}
 
-    if not child then
-        return require("code").peek(job)
-    end
+And create `~/.config/lf/preview` with:
 
-    local limit = job.area.h
-    local i, lines = 0, ""
-    repeat
-        local next, event = child:read_line()
-        if event == 1 then
-            return require("code").peek(job)
-        elseif event ~= 0 then
-            break
-        end
+    #!/bin/sh
+    COLUMNS="$2" LINES="$3" exec rsp "$1"
 
-        i = i + 1
-        if i > job.skip then
-            lines = lines .. next
-        end
-    until i >= job.skip + limit
+### Usage with [ranger](https://github.com/ranger/ranger)
 
-    child:start_kill()
-    if job.skip > 0 and i < job.skip + limit then
-        ya.emit("peek", { math.max(0, i - limit), only_if = job.file.url, upper_bound = true })
-    else
-        lines = lines:gsub("\t", string.rep(" ", rt.preview.tab_size))
-        ya.preview_widgets(job, {
-            ui.Text.parse(lines):area(job.area):wrap(rt.preview.wrap == "yes" and ui.Text.WRAP or ui.Text.WRAP_NO),
-        })
-    end
-end
+**Warning: because ranger is built on Python's old ncurses version, the preview panel only supports 8bit colors (see https://github.com/ranger/ranger/issues/690#issuecomment-255590479), so if the output seems wrong you may need to tweak handlers to generate 8bit colors instead of 24.**
 
-function M:seek(job) require("code"):seek(job) end
+In `rifle.conf`:
 
-return M
-```
+    = rso "$@"
 
-</details>
+In `scope.sh`:
+
+    #!/bin/sh
+    COLUMNS="$2" LINES="$3" exec rsp "$1"
+
+Dont forget to make it executable with `chmod +x ~/.config/ranger/scope.sh`.
 
 ## Show me some cool stuff `rsop` can do
 
