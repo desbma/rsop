@@ -362,6 +362,8 @@ impl HandlerMapping {
         path: &Path,
         mime: Option<&str>,
         term_size: (u16, u16),
+        tmp_file: Option<&tempfile::NamedTempFile>,
+        tmp_dir: Option<&tempfile::TempDir>,
     ) -> anyhow::Result<String> {
         const BASE_SUBST_REGEX: &str = "([^%])(%{})";
         const BASE_SUBST_UNESCAPE_SRC: &str = "%%";
@@ -405,6 +407,30 @@ impl HandlerMapping {
                 const_format::str_replace!(BASE_SUBST_REGEX, "{}", "m"),
                 const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'm'),
                 const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'm'),
+            ));
+        }
+        if let Some(tmp_file) = tmp_file {
+            subst_params.push((
+                tmp_file
+                    .path()
+                    .to_str()
+                    .ok_or_else(|| anyhow::anyhow!("Invalid path {path:?}"))?
+                    .to_owned(),
+                const_format::str_replace!(BASE_SUBST_REGEX, "{}", "t"),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 't'),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 't'),
+            ));
+        }
+        if let Some(tmp_dir) = tmp_dir {
+            subst_params.push((
+                tmp_dir
+                    .path()
+                    .to_str()
+                    .ok_or_else(|| anyhow::anyhow!("Invalid path {path:?}"))?
+                    .to_owned(),
+                const_format::str_replace!(BASE_SUBST_REGEX, "{}", "T"),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_SRC, 'T'),
+                const_format::concatcp!(BASE_SUBST_UNESCAPE_DST, 'T'),
             ));
         }
         for (val, re_str, unescape_src, unescape_dst) in subst_params {
@@ -466,7 +492,26 @@ impl HandlerMapping {
         mime: Option<&str>,
         term_size: (u16, u16),
     ) -> Result<Child, HandlerError> {
-        let cmd = Self::substitute(&filter.command, path, mime, term_size)?;
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_file = if Self::count_pattern(&filter.command, 't') > 0 {
+            Some(tempfile::NamedTempFile::new()?)
+        } else {
+            None
+        };
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_dir = if Self::count_pattern(&filter.command, 'T') > 0 {
+            Some(tempfile::tempdir()?)
+        } else {
+            None
+        };
+        let cmd = Self::substitute(
+            &filter.command,
+            path,
+            mime,
+            term_size,
+            tmp_file.as_ref(),
+            tmp_dir.as_ref(),
+        )?;
         let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -487,7 +532,26 @@ impl HandlerMapping {
         mime: Option<&str>,
         term_size: (u16, u16),
     ) -> Result<(), HandlerError> {
-        let cmd = Self::substitute(&handler.command, path, mime, term_size)?;
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_file = if Self::count_pattern(&handler.command, 't') > 0 {
+            Some(tempfile::NamedTempFile::new()?)
+        } else {
+            None
+        };
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_dir = if Self::count_pattern(&handler.command, 'T') > 0 {
+            Some(tempfile::tempdir()?)
+        } else {
+            None
+        };
+        let cmd = Self::substitute(
+            &handler.command,
+            path,
+            mime,
+            term_size,
+            tmp_file.as_ref(),
+            tmp_dir.as_ref(),
+        )?;
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         let mut command = Command::new(&cmd_args[0]);
@@ -585,7 +649,26 @@ impl HandlerMapping {
         } else {
             PathBuf::from("-")
         };
-        let cmd = Self::substitute(&filter.command, &path, mime, term_size)?;
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_file2 = if Self::count_pattern(&filter.command, 't') > 0 {
+            Some(tempfile::NamedTempFile::new()?)
+        } else {
+            None
+        };
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_dir = if Self::count_pattern(&filter.command, 'T') > 0 {
+            Some(tempfile::tempdir()?)
+        } else {
+            None
+        };
+        let cmd = Self::substitute(
+            &filter.command,
+            &path,
+            mime,
+            term_size,
+            tmp_file2.as_ref(),
+            tmp_dir.as_ref(),
+        )?;
         let cmd_args = Self::build_cmd(&cmd, filter.shell)?;
 
         // Run
@@ -631,7 +714,26 @@ impl HandlerMapping {
         } else {
             PathBuf::from("-")
         };
-        let cmd = Self::substitute(&handler.command, &path, mime, term_size)?;
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_file2 = if Self::count_pattern(&handler.command, 't') > 0 {
+            Some(tempfile::NamedTempFile::new()?)
+        } else {
+            None
+        };
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_dir = if Self::count_pattern(&handler.command, 'T') > 0 {
+            Some(tempfile::tempdir()?)
+        } else {
+            None
+        };
+        let cmd = Self::substitute(
+            &handler.command,
+            &path,
+            mime,
+            term_size,
+            tmp_file2.as_ref(),
+            tmp_dir.as_ref(),
+        )?;
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         // Run
@@ -674,7 +776,26 @@ impl HandlerMapping {
 
         // Build command
         let path: PathBuf = PathBuf::from(url.to_owned().as_str());
-        let cmd = Self::substitute(&handler.command, &path, None, term_size)?;
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_file = if Self::count_pattern(&handler.command, 't') > 0 {
+            Some(tempfile::NamedTempFile::new()?)
+        } else {
+            None
+        };
+        #[expect(clippy::if_then_some_else_none)]
+        let tmp_dir = if Self::count_pattern(&handler.command, 'T') > 0 {
+            Some(tempfile::tempdir()?)
+        } else {
+            None
+        };
+        let cmd = Self::substitute(
+            &handler.command,
+            &path,
+            None,
+            term_size,
+            tmp_file.as_ref(),
+            tmp_dir.as_ref(),
+        )?;
         let cmd_args = Self::build_cmd(&cmd, handler.shell)?;
 
         // Run
@@ -844,15 +965,15 @@ mod tests {
         let path = Path::new("");
 
         assert_eq!(
-            HandlerMapping::substitute("abc def", path, None, term_size).unwrap(),
+            HandlerMapping::substitute("abc def", path, None, term_size, None, None).unwrap(),
             "abc def"
         );
         assert_eq!(
-            HandlerMapping::substitute("ab%%c def", path, None, term_size).unwrap(),
+            HandlerMapping::substitute("ab%%c def", path, None, term_size, None, None).unwrap(),
             "ab%c def"
         );
         assert_eq!(
-            HandlerMapping::substitute("ab%c def", path, None, term_size).unwrap(),
+            HandlerMapping::substitute("ab%c def", path, None, term_size, None, None).unwrap(),
             "ab85 def"
         );
     }

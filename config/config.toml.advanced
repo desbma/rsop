@@ -202,6 +202,8 @@ mimes = ["application/zstd"]
 #   %i: input path
 #   %l: terminal line count
 #   %m: input MIME type
+#   %t: a temporary file created before handler invocation, and deleted on exit
+#   %T: a temporary directory created before handler invocation, and deleted on exit
 # Use '%%' if you need to pass a literal '%' char.
 #
 # - shell
