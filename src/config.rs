@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::Write,
+    io::Write as _,
     path::{Path, PathBuf},
 };
 
@@ -83,20 +83,20 @@ fn get_config_path() -> anyhow::Result<PathBuf> {
         p
     } else {
         let path = xdg_dirs.place_config_file(CONFIG_FILENAME)?;
-        log::warn!("No config file found, creating a default one in {:?}", path);
+        log::warn!("No config file found, creating a default one in {path:?}");
         let mut file = File::create(&path)?;
         file.write_all(DEFAULT_CONFIG_STR.as_bytes())?;
         path
     };
 
-    log::debug!("Config filepath: {:?}", config_filepath);
+    log::debug!("Config filepath: {config_filepath:?}");
 
     Ok(config_filepath)
 }
 
 fn parse_config_path(path: &Path) -> anyhow::Result<Config> {
     let toml_data = std::fs::read_to_string(path)?;
-    log::trace!("Config data: {:?}", toml_data);
+    log::trace!("Config data: {toml_data:?}");
 
     let mut config: Config = toml::from_str(&toml_data)?;
     // Normalize extensions to lower case
@@ -107,7 +107,7 @@ fn parse_config_path(path: &Path) -> anyhow::Result<Config> {
             .map(|e| e.to_lowercase())
             .collect();
     }
-    log::trace!("Config: {:?}", config);
+    log::trace!("Config: {config:?}");
 
     Ok(config)
 }
@@ -117,7 +117,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tiny_config() {
+    fn tiny_config() {
         const TINY_CONFIG_STR: &str = include_str!("../config/config.toml.tiny");
         let mut config_file = tempfile::NamedTempFile::new().unwrap();
         config_file.write_all(TINY_CONFIG_STR.as_bytes()).unwrap();
@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config() {
+    fn default_config() {
         const DEFAULT_CONFIG_STR: &str = include_str!("../config/config.toml.default");
         let mut config_file = tempfile::NamedTempFile::new().unwrap();
         config_file
@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn test_advanced_config() {
+    fn advanced_config() {
         const ADVANCED_CONFIG_STR: &str = include_str!("../config/config.toml.advanced");
         let mut config_file = tempfile::NamedTempFile::new().unwrap();
         config_file

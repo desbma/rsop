@@ -1,10 +1,10 @@
 //! RSOP
 
-use std::{collections::BTreeMap, env, path::Path, str::FromStr, sync::LazyLock};
+use std::{collections::BTreeMap, env, path::Path, str::FromStr as _, sync::LazyLock};
 
-use anyhow::Context;
-use clap::Parser;
-use strum::VariantNames;
+use anyhow::Context as _;
+use clap::Parser as _;
+use strum::VariantNames as _;
 
 mod cli;
 mod config;
@@ -61,7 +61,7 @@ fn runtime_mode() -> anyhow::Result<RsopMode> {
     log::warn!(
         "Ambiguous runtime mode, defaulting to {}. \
          Please use one of the {} commands or set RSOP_MODE to either {}.",
-        RsopMode::default().to_string(),
+        RsopMode::default(),
         BIN_NAME_TO_MODE
             .keys()
             .copied()
@@ -80,16 +80,16 @@ fn main() -> anyhow::Result<()> {
 
     // Parse command line opts
     let mode = runtime_mode()?;
-    log::trace!("Runtime mode: {:?}", mode);
+    log::trace!("Runtime mode: {mode:?}");
     let cl_opts = cli::CommandLineOpts::parse();
-    log::trace!("{:?}", cl_opts);
+    log::trace!("{cl_opts:?}");
 
     // Parse config
     let cfg = config::parse_config().context("Failed to read config")?;
 
     // Build mapping for fast searches
     let handlers = handler::HandlerMapping::new(&cfg).context("Failed to build handler mapping")?;
-    log::debug!("{:?}", handlers);
+    log::debug!("{handlers:?}");
 
     // Do the job
     if let Some(path) = cl_opts.path {

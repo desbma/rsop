@@ -2,11 +2,11 @@ use std::{
     collections::HashMap,
     env,
     fs::File,
-    io::{self, copy, stdin, Read, Write},
+    io::{self, Read, Write, copy, stdin},
     iter,
     os::unix::{
-        fs::FileTypeExt,
-        io::{AsRawFd, FromRawFd},
+        fs::FileTypeExt as _,
+        io::{AsRawFd as _, FromRawFd as _},
     },
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -16,9 +16,8 @@ use std::{
 use anyhow::Context as _;
 
 use crate::{
-    config,
+    RsopMode, config,
     config::{FileFilter, FileHandler, SchemeHandler},
-    RsopMode,
 };
 
 #[derive(Debug)]
@@ -203,7 +202,7 @@ impl HandlerMapping {
             if url.scheme() == "file" {
                 let url_path = &url[url::Position::BeforeUsername..];
                 let parsed_path = PathBuf::from(url_path);
-                log::trace!("url={}, parsed_path={:?}", url, parsed_path);
+                log::trace!("url={url}, parsed_path={parsed_path:?}");
                 self.dispatch_path(&parsed_path, mode)
             } else {
                 self.dispatch_url(&url)
@@ -232,7 +231,7 @@ impl HandlerMapping {
             File::open(path)?;
             tree_magic_mini::from_filepath(path)
         };
-        log::debug!("MIME: {:?}", mime);
+        log::debug!("MIME: {mime:?}");
 
         Ok(mime)
     }
@@ -313,16 +312,13 @@ impl HandlerMapping {
         };
 
         // Read header
-        log::trace!(
-            "Using max header length of {} bytes",
-            PIPE_INITIAL_READ_LENGTH
-        );
+        log::trace!("Using max header length of {PIPE_INITIAL_READ_LENGTH} bytes");
         let mut buffer: Vec<u8> = vec![0; PIPE_INITIAL_READ_LENGTH];
         let header_len = pipe.read(&mut buffer)?;
         let header = &buffer[0..header_len];
 
         let mime = tree_magic_mini::from_u8(header);
-        log::debug!("MIME: {:?}", mime);
+        log::debug!("MIME: {mime:?}");
         if let RsopMode::Identify = mode {
             println!("{mime}");
             return Ok(());
@@ -743,7 +739,7 @@ impl HandlerMapping {
         } else {
             shlex::split(cmd).ok_or_else(|| anyhow::anyhow!("Invalid command {:?}", cmd))?
         };
-        log::debug!("Will run command: {:?}", cmd);
+        log::debug!("Will run command: {cmd:?}");
         Ok(cmd)
     }
 
@@ -804,7 +800,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_has_pattern() {
+    fn has_pattern() {
         let mut handler = FileHandler {
             command: "a ii".to_owned(),
             wait: false,
@@ -828,7 +824,7 @@ mod tests {
     }
 
     #[test]
-    fn test_count_pattern() {
+    fn count_pattern() {
         assert_eq!(HandlerMapping::count_pattern("aa ii ii", 'm'), 0);
         assert_eq!(HandlerMapping::count_pattern("aa ii ii", 'i'), 0);
 
@@ -843,7 +839,7 @@ mod tests {
     }
 
     #[test]
-    fn test_substitute() {
+    fn substitute() {
         let term_size = (85, 84);
         let path = Path::new("");
 
@@ -862,7 +858,7 @@ mod tests {
     }
 
     #[test]
-    fn test_path_extensions() {
+    fn path_extensions() {
         assert_eq!(
             HandlerMapping::path_extensions(Path::new("/tmp/")).ok(),
             Some(vec![])
@@ -890,7 +886,7 @@ mod tests {
     }
 
     #[test]
-    fn test_split_mime() {
+    fn split_mime() {
         assert_eq!(
             HandlerMapping::split_mime("application/vnd.debian.binary-package"),
             vec![
