@@ -128,8 +128,7 @@ impl HandlerMapping {
                     || handler_edit.is_some()
                     || handler_preview.is_some()
                     || filter.is_some(),
-                "Filetype {} is not bound to any handler or filter",
-                name
+                "Filetype {name} is not bound to any handler or filter"
             );
             if let Some(handler_open) = handler_open {
                 Self::validate_handler(&handler_open)?;
@@ -146,8 +145,7 @@ impl HandlerMapping {
             if let Some(filter) = filter {
                 anyhow::ensure!(
                     filter.no_pipe || (Self::count_pattern(&filter.command, 'i') <= 1),
-                    "Filter {:?} can not have both 'no_pipe = false' and multiple %i in command",
-                    filter
+                    "Filter {filter:?} can not have both 'no_pipe = false' and multiple %i in command"
                 );
                 let proc_filter = Rc::new(FileProcessor::Filter(filter));
                 handlers_open.add(&Rc::clone(&proc_filter), filetype);
@@ -172,13 +170,11 @@ impl HandlerMapping {
     fn validate_handler(handler: &FileHandler) -> anyhow::Result<()> {
         anyhow::ensure!(
             !handler.no_pipe || handler.wait,
-            "Handler {:?} can not have both 'no_pipe = true' and 'wait = false'",
-            handler
+            "Handler {handler:?} can not have both 'no_pipe = true' and 'wait = false'"
         );
         anyhow::ensure!(
             handler.no_pipe || (Self::count_pattern(&handler.command, 'i') <= 1),
-            "Handler {:?} can not have both 'no_pipe = false' and multiple %i in command",
-            handler
+            "Handler {handler:?} can not have both 'no_pipe = false' and multiple %i in command"
         );
         Ok(())
     }
@@ -196,7 +192,7 @@ impl HandlerMapping {
             &mode,
             url::Url::parse(
                 path.to_str()
-                    .ok_or_else(|| anyhow::anyhow!("Unable to decode path {:?}", path))?,
+                    .ok_or_else(|| anyhow::anyhow!("Unable to decode path {path:?}"))?,
             ),
         ) {
             if url.scheme() == "file" {
@@ -272,7 +268,7 @@ impl HandlerMapping {
         if let RsopMode::Identify = mode {
             println!(
                 "{}",
-                mime.ok_or_else(|| anyhow::anyhow!("Unable to get MIME type for {:?}", path))?
+                mime.ok_or_else(|| anyhow::anyhow!("Unable to get MIME type for {path:?}"))?
             );
             return Ok(());
         }
@@ -351,8 +347,7 @@ impl HandlerMapping {
         }
 
         Err(HandlerError::Other(anyhow::anyhow!(
-            "No handler for scheme {:?}",
-            scheme
+            "No handler for scheme {scheme:?}"
         )))
     }
 
@@ -637,7 +632,7 @@ impl HandlerMapping {
 
                 r
             })
-            .map_err(|e| anyhow::anyhow!("Worker thread error: {:?}", e))?,
+            .map_err(|e| anyhow::anyhow!("Worker thread error: {e:?}"))?,
         }
     }
 
@@ -864,7 +859,7 @@ impl HandlerMapping {
         let cmd = if shell {
             vec!["sh".to_owned(), "-c".to_owned(), cmd.to_owned()]
         } else {
-            shlex::split(cmd).ok_or_else(|| anyhow::anyhow!("Invalid command {:?}", cmd))?
+            shlex::split(cmd).ok_or_else(|| anyhow::anyhow!("Invalid command {cmd:?}"))?
         };
         log::debug!("Will run command: {cmd:?}");
         Ok(cmd)
@@ -877,7 +872,7 @@ impl HandlerMapping {
             let filename = path
                 .file_name()
                 .and_then(|f| f.to_str())
-                .ok_or_else(|| anyhow::anyhow!("Unable to get file name from path {:?}", path))?;
+                .ok_or_else(|| anyhow::anyhow!("Unable to get file name from path {path:?}"))?;
             let double_ext_parts: Vec<_> = filename
                 .split('.')
                 .skip(1)
@@ -895,9 +890,7 @@ impl HandlerMapping {
             extensions.push(
                 extension
                     .to_str()
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("Unable to decode extension for path {:?}", path)
-                    })?
+                    .ok_or_else(|| anyhow::anyhow!("Unable to decode extension for path {path:?}"))?
                     .to_lowercase(),
             );
         }
