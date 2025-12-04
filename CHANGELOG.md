@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.1 - 2025-12-04
+
+### <!-- 02 -->🐛 Bug fixes
+
+- Ignore filters in edit mode ([ec9cb40](https://github.com/desbma/rsop/commit/ec9cb40a2fbebe896585d1abcacbc0d53f6c1722) by desbma)
+
+### <!-- 10 -->🧰 Miscellaneous tasks
+
+- Update lints ([89b3d88](https://github.com/desbma/rsop/commit/89b3d88fcb6e6855fc020eebeae1286823fce08f) by desbma)
+
+______________________________________________________________________
+
 ## 1.5.0 - 2025-09-16
 
 ### <!-- 01 -->💡 Features
