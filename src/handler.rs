@@ -151,7 +151,7 @@ impl HandlerMapping {
                 );
                 let proc_filter = Rc::new(FileProcessor::Filter(filter));
                 handlers_open.add(&Rc::clone(&proc_filter), filetype);
-                handlers_edit.add(&Rc::clone(&proc_filter), filetype);
+                // handlers_edit.add(&Rc::clone(&proc_filter), filetype);
                 handlers_preview.add(&Rc::clone(&proc_filter), filetype);
             }
         }
