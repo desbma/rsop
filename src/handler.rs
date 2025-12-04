@@ -449,11 +449,17 @@ impl HandlerMapping {
             let cols_env = env::var("FZF_PREVIEW_COLUMNS")
                 .ok()
                 .and_then(|v| v.parse::<u16>().ok())
-                .or_else(|| env::var("COLUMNS").ok().and_then(|v| v.parse::<u16>().ok()));
+                .or_else(|| {
+                    let v = env::var("COLUMNS").ok()?;
+                    v.parse::<u16>().ok()
+                });
             let rows_env = env::var("FZF_PREVIEW_LINES")
                 .ok()
                 .and_then(|v| v.parse::<u16>().ok())
-                .or_else(|| env::var("LINES").ok().and_then(|v| v.parse::<u16>().ok()));
+                .or_else(|| {
+                    let v = env::var("LINES").ok()?;
+                    v.parse::<u16>().ok()
+                });
             if let (Some(cols), Some(rows)) = (cols_env, rows_env) {
                 (cols, rows)
             } else {
