@@ -493,13 +493,11 @@ impl HandlerMapping {
         mime: Option<&str>,
         term_size: (u16, u16),
     ) -> Result<Child, HandlerError> {
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_file = if Self::count_pattern(&filter.command, 't') > 0 {
             Some(tempfile::NamedTempFile::new()?)
         } else {
             None
         };
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_dir = if Self::count_pattern(&filter.command, 'T') > 0 {
             Some(tempfile::tempdir()?)
         } else {
@@ -533,13 +531,11 @@ impl HandlerMapping {
         mime: Option<&str>,
         term_size: (u16, u16),
     ) -> Result<(), HandlerError> {
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_file = if Self::count_pattern(&handler.command, 't') > 0 {
             Some(tempfile::NamedTempFile::new()?)
         } else {
             None
         };
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_dir = if Self::count_pattern(&handler.command, 'T') > 0 {
             Some(tempfile::tempdir()?)
         } else {
@@ -650,13 +646,11 @@ impl HandlerMapping {
         } else {
             PathBuf::from("-")
         };
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_file2 = if Self::count_pattern(&filter.command, 't') > 0 {
             Some(tempfile::NamedTempFile::new()?)
         } else {
             None
         };
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_dir = if Self::count_pattern(&filter.command, 'T') > 0 {
             Some(tempfile::tempdir()?)
         } else {
@@ -715,13 +709,11 @@ impl HandlerMapping {
         } else {
             PathBuf::from("-")
         };
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_file2 = if Self::count_pattern(&handler.command, 't') > 0 {
             Some(tempfile::NamedTempFile::new()?)
         } else {
             None
         };
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_dir = if Self::count_pattern(&handler.command, 'T') > 0 {
             Some(tempfile::tempdir()?)
         } else {
@@ -777,13 +769,11 @@ impl HandlerMapping {
 
         // Build command
         let path: PathBuf = PathBuf::from(url.to_owned().as_str());
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_file = if Self::count_pattern(&handler.command, 't') > 0 {
             Some(tempfile::NamedTempFile::new()?)
         } else {
             None
         };
-        #[expect(clippy::if_then_some_else_none)]
         let tmp_dir = if Self::count_pattern(&handler.command, 'T') > 0 {
             Some(tempfile::tempdir()?)
         } else {
