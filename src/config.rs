@@ -78,7 +78,7 @@ fn get_config_path() -> anyhow::Result<PathBuf> {
     const CONFIG_FILENAME: &str = "config.toml";
     const DEFAULT_CONFIG_STR: &str = include_str!("../config/config.toml.default");
     let binary_name = env!("CARGO_PKG_NAME");
-    let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name)?;
+    let xdg_dirs = xdg::BaseDirectories::with_prefix(binary_name);
     let config_filepath = if let Some(p) = xdg_dirs.find_config_file(CONFIG_FILENAME) {
         p
     } else {
