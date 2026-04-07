@@ -44,8 +44,9 @@ mimes = ["text"]
 # If true, waits for the handler to exit. Defaults to true.
 #
 # - no_pipe
-# If true, disable piping data to handler's stdin, and use a slower temporary file instead if data is piped to rsop.
-# Incompatible with 'wait = false'. Defaults to false.
+# If true, do not pipe data to the handler's stdin; instead pass it via a file path. On Linux this
+# uses a memfd, on other platforms a temporary file. Defaults to false.
+# Cannot be combined with 'wait = false' if the command uses '%t' or '%T'.
 #
 # - stdin_arg
 # When previewing or opening data from stdin, with what string to substitute '%i'. Defaults to "-", some programs require "".

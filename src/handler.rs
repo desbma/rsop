@@ -29,6 +29,8 @@ enum FileProcessor {
 enum PipeOrTmpFile<T> {
     Pipe(T),
     TmpFile(tempfile::NamedTempFile),
+    #[cfg(target_os = "linux")]
+    MemFd(File),
 }
 
 impl FileProcessor {
@@ -168,9 +170,18 @@ impl HandlerMapping {
     }
 
     fn validate_handler(handler: &FileHandler) -> anyhow::Result<()> {
+        #[cfg(not(target_os = "linux"))]
         anyhow::ensure!(
             !handler.no_pipe || handler.wait,
             "Handler {handler:?} can not have both 'no_pipe = true' and 'wait = false'"
+        );
+        #[cfg(target_os = "linux")]
+        anyhow::ensure!(
+            !handler.no_pipe
+                || handler.wait
+                || (Self::count_pattern(&handler.command, 't') == 0
+                    && Self::count_pattern(&handler.command, 'T') == 0),
+            "Handler {handler:?} can not have 'no_pipe = true' and 'wait = false' with %t or %T patterns"
         );
         anyhow::ensure!(
             handler.no_pipe || (Self::count_pattern(&handler.command, 'i') <= 1),
@@ -694,20 +705,38 @@ impl HandlerMapping {
     where
         T: Read,
     {
-        // Write to a temporary file if handler does not support reading from stdin
+        // Write to a temporary file (or memfd) if handler does not support reading from stdin
         let input = if handler.no_pipe {
-            PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+            #[cfg(target_os = "linux")]
+            {
+                if handler.wait {
+                    PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+                } else {
+                    PipeOrTmpFile::MemFd(Self::pipe_to_memfd(header, pipe)?)
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+            }
         } else {
             PipeOrTmpFile::Pipe(pipe)
         };
 
         // Build command
-        let path = if let PipeOrTmpFile::TmpFile(tmp_file) = &input {
-            tmp_file.path().to_path_buf()
-        } else if let Some(stdin_arg) = &handler.stdin_arg {
-            PathBuf::from(stdin_arg)
-        } else {
-            PathBuf::from("-")
+        let path = match &input {
+            PipeOrTmpFile::TmpFile(tmp_file) => tmp_file.path().to_path_buf(),
+            #[cfg(target_os = "linux")]
+            PipeOrTmpFile::MemFd(file) => {
+                PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd()))
+            }
+            PipeOrTmpFile::Pipe(_) => {
+                if let Some(stdin_arg) = &handler.stdin_arg {
+                    PathBuf::from(stdin_arg)
+                } else {
+                    PathBuf::from("-")
+                }
+            }
         };
         let tmp_file2 = if Self::count_pattern(&handler.command, 't') > 0 {
             Some(tempfile::NamedTempFile::new()?)
@@ -757,7 +786,7 @@ impl HandlerMapping {
             drop(child_stdin);
         }
 
-        if handler.wait || handler.no_pipe {
+        if handler.wait {
             child.wait()?;
         }
 
@@ -829,6 +858,25 @@ impl HandlerMapping {
         );
 
         Ok(header.len() + copied)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn pipe_to_memfd<T>(header: &[u8], mut pipe: T) -> anyhow::Result<File>
+    where
+        T: Read,
+    {
+        use std::io::Seek as _;
+        // Create the memfd *without* MFD_CLOEXEC so the fd is inherited by
+        // the child across exec() — that's what keeps the memfd alive once
+        // the parent exits.
+        let name = std::ffi::CString::new(env!("CARGO_PKG_NAME")).context("Invalid memfd name")?;
+        let fd = nix::sys::memfd::memfd_create(name.as_c_str(), nix::sys::memfd::MFdFlags::empty())
+            .context("memfd_create failed")?;
+        let mut file = File::from(fd);
+        log::debug!("Writing to memfd at fd {}", file.as_raw_fd());
+        Self::pipe_forward(&mut pipe, &mut file, header)?;
+        file.seek(io::SeekFrom::Start(0))?;
+        Ok(file)
     }
 
     fn pipe_to_tmpfile<T>(header: &[u8], mut pipe: T) -> anyhow::Result<tempfile::NamedTempFile>
@@ -1085,15 +1133,8 @@ mod tests {
         let path = Path::new("/tmp/test.txt");
 
         assert_eq!(
-            HandlerMapping::substitute(
-                "echo %m",
-                path,
-                Some("text/plain"),
-                term_size,
-                None,
-                None
-            )
-            .unwrap(),
+            HandlerMapping::substitute("echo %m", path, Some("text/plain"), term_size, None, None)
+                .unwrap(),
             "echo text/plain"
         );
     }
@@ -1104,8 +1145,7 @@ mod tests {
         let path = Path::new("");
 
         assert_eq!(
-            HandlerMapping::substitute("head -n %l %i", path, None, term_size, None, None)
-                .unwrap(),
+            HandlerMapping::substitute("head -n %l %i", path, None, term_size, None, None).unwrap(),
             "head -n 40"
         );
         assert_eq!(
@@ -1133,15 +1173,8 @@ mod tests {
             "a %l b"
         );
         assert_eq!(
-            HandlerMapping::substitute(
-                "a %%m b",
-                path,
-                Some("text/plain"),
-                term_size,
-                None,
-                None
-            )
-            .unwrap(),
+            HandlerMapping::substitute("a %%m b", path, Some("text/plain"), term_size, None, None)
+                .unwrap(),
             "a %m b"
         );
     }
@@ -1218,15 +1251,8 @@ mod tests {
         let path = Path::new("");
 
         assert_eq!(
-            HandlerMapping::substitute(
-                "plain command here",
-                path,
-                None,
-                term_size,
-                None,
-                None
-            )
-            .unwrap(),
+            HandlerMapping::substitute("plain command here", path, None, term_size, None, None)
+                .unwrap(),
             "plain command here"
         );
     }
@@ -1258,10 +1284,7 @@ mod tests {
 
     #[test]
     fn count_pattern_mixed() {
-        assert_eq!(
-            HandlerMapping::count_pattern("a %i b %%i c %i", 'i'),
-            2
-        );
+        assert_eq!(HandlerMapping::count_pattern("a %i b %%i c %i", 'i'), 2);
     }
 
     #[test]
@@ -1364,6 +1387,56 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
+    fn handler_mapping_no_pipe_and_no_wait_ok_on_linux() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "text".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["text".to_owned()],
+            },
+        );
+        config.handler_preview.insert(
+            "text".to_owned(),
+            FileHandler {
+                command: "cat %i".to_owned(),
+                wait: false,
+                shell: false,
+                no_pipe: true,
+                stdin_arg: None,
+            },
+        );
+        assert!(HandlerMapping::new(&config).is_ok());
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn handler_mapping_no_pipe_no_wait_with_tmp_rejected() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "text".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["text".to_owned()],
+            },
+        );
+        config.handler_preview.insert(
+            "text".to_owned(),
+            FileHandler {
+                command: "do %i %t".to_owned(),
+                wait: false,
+                shell: false,
+                no_pipe: true,
+                stdin_arg: None,
+            },
+        );
+        let err = HandlerMapping::new(&config).unwrap_err();
+        assert!(err.to_string().contains("%t"));
+    }
+
+    #[test]
+    #[cfg(not(target_os = "linux"))]
     fn handler_mapping_no_pipe_and_no_wait() {
         let mut config = minimal_config();
         config.filetype.insert(
@@ -1586,7 +1659,10 @@ mod tests {
         };
         scheme_handlers.add(&handler, "https");
         assert!(scheme_handlers.schemes.contains_key("https"));
-        assert_eq!(scheme_handlers.schemes.get("https").unwrap().command, "firefox %i");
+        assert_eq!(
+            scheme_handlers.schemes.get("https").unwrap().command,
+            "firefox %i"
+        );
     }
 
     #[test]
@@ -1602,6 +1678,33 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
+    fn validate_handler_no_pipe_no_wait_ok_on_linux() {
+        let handler = FileHandler {
+            command: "cat %i".to_owned(),
+            wait: false,
+            shell: false,
+            no_pipe: true,
+            stdin_arg: None,
+        };
+        assert!(HandlerMapping::validate_handler(&handler).is_ok());
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn validate_handler_no_pipe_no_wait_with_tmp_rejected() {
+        let handler = FileHandler {
+            command: "do %i %T".to_owned(),
+            wait: false,
+            shell: false,
+            no_pipe: true,
+            stdin_arg: None,
+        };
+        assert!(HandlerMapping::validate_handler(&handler).is_err());
+    }
+
+    #[test]
+    #[cfg(not(target_os = "linux"))]
     fn validate_handler_no_pipe_no_wait() {
         let handler = FileHandler {
             command: "cat %i".to_owned(),
@@ -1611,6 +1714,16 @@ mod tests {
             stdin_arg: None,
         };
         assert!(HandlerMapping::validate_handler(&handler).is_err());
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn pipe_to_memfd_with_data() {
+        let pipe = io::Cursor::new(b"rest of data");
+        let file = HandlerMapping::pipe_to_memfd(b"header-", pipe).unwrap();
+        let path = format!("/proc/self/fd/{}", file.as_raw_fd());
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "header-rest of data");
     }
 
     #[test]

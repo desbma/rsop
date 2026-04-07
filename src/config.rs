@@ -272,7 +272,9 @@ command = "file %i"
     #[test]
     fn invalid_toml() {
         let mut config_file = tempfile::NamedTempFile::new().unwrap();
-        config_file.write_all(b"this is not valid toml [[[").unwrap();
+        config_file
+            .write_all(b"this is not valid toml [[[")
+            .unwrap();
 
         let err = parse_config_path(config_file.path()).unwrap_err();
         assert!(err.downcast_ref::<toml::de::Error>().is_some());
