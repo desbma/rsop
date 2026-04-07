@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.6.0 - 2026-04-07
+
+### <!-- 01 -->💡 Features
+
+- Memfd to support 'no_wait = true' with pipe ([a8688af](https://github.com/desbma/rsop/commit/a8688af7bf7fc529bdd52f1897ea24a6527776c1) by desbma)
+
+### <!-- 05 -->🧪 Testing
+
+- Add many tests ([18d415d](https://github.com/desbma/rsop/commit/18d415d2125db39d44cc9cd7387fed4b18b7f952) by desbma)
+
+### <!-- 09 -->🤖 Continuous integration
+
+- Remove unneeded permission for cargo audit ([c726388](https://github.com/desbma/rsop/commit/c726388d6341def24261cdc339ad71ffceb00c8e) by desbma)
+- Update actions ([50f8fc6](https://github.com/desbma/rsop/commit/50f8fc6c4e3c8c977480c3f22b1a40513f800485) by desbma)
+- Update audit action ([f22386a](https://github.com/desbma/rsop/commit/f22386a0703bfd3af11a3728b4fb9b693faabf96) by desbma)
+
+### <!-- 10 -->🧰 Miscellaneous tasks
+
+- Fix lints ([6f5c30b](https://github.com/desbma/rsop/commit/6f5c30b9889f3971c42b6a50d60d7e8546dc1d9f) by desbma)
+- Fix lint ([7c80b82](https://github.com/desbma/rsop/commit/7c80b82815cab0491651f7037044f8a11ec31df3) by desbma)
+- Update dependencies ([c6e5b9e](https://github.com/desbma/rsop/commit/c6e5b9eb3ff1b9219c8d68aacfef81e75267861c) by desbma)
+- Add AGENTS.md + remove pre-commit hooks ([29b3716](https://github.com/desbma/rsop/commit/29b3716b197dcb0e7125e64d3953bc7cffb77331) by desbma)
+- Update dependencies ([abb45eb](https://github.com/desbma/rsop/commit/abb45eb811f91e175157f356fc0a3fa2d00fcef0) by desbma)
+
+______________________________________________________________________
+
 ## 1.5.1 - 2025-12-04
 
 ### <!-- 02 -->🐛 Bug fixes
