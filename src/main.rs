@@ -100,3 +100,95 @@ fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr as _;
+
+    use super::*;
+
+    #[test]
+    fn rsop_mode_default() {
+        assert_eq!(RsopMode::default(), RsopMode::Open);
+    }
+
+    #[test]
+    fn rsop_mode_display() {
+        assert_eq!(RsopMode::Preview.to_string(), "preview");
+        assert_eq!(RsopMode::Open.to_string(), "open");
+        assert_eq!(RsopMode::XdgOpen.to_string(), "xdg-open");
+        assert_eq!(RsopMode::Edit.to_string(), "edit");
+        assert_eq!(RsopMode::Identify.to_string(), "identify");
+    }
+
+    #[test]
+    fn rsop_mode_from_str() {
+        assert_eq!(RsopMode::from_str("preview").unwrap(), RsopMode::Preview);
+        assert_eq!(RsopMode::from_str("open").unwrap(), RsopMode::Open);
+        assert_eq!(RsopMode::from_str("xdg-open").unwrap(), RsopMode::XdgOpen);
+        assert_eq!(RsopMode::from_str("edit").unwrap(), RsopMode::Edit);
+        assert_eq!(RsopMode::from_str("identify").unwrap(), RsopMode::Identify);
+    }
+
+    #[test]
+    fn rsop_mode_from_str_case_insensitive() {
+        assert_eq!(RsopMode::from_str("PREVIEW").unwrap(), RsopMode::Preview);
+        assert_eq!(RsopMode::from_str("Preview").unwrap(), RsopMode::Preview);
+        assert_eq!(RsopMode::from_str("XDG-OPEN").unwrap(), RsopMode::XdgOpen);
+        assert_eq!(RsopMode::from_str("Xdg-Open").unwrap(), RsopMode::XdgOpen);
+    }
+
+    #[test]
+    fn rsop_mode_from_str_invalid() {
+        assert!(RsopMode::from_str("unknown").is_err());
+        assert!(RsopMode::from_str("").is_err());
+    }
+
+    #[test]
+    fn bin_name_to_mode_mappings() {
+        assert_eq!(*BIN_NAME_TO_MODE.get("rsp").unwrap(), RsopMode::Preview);
+        assert_eq!(*BIN_NAME_TO_MODE.get("rso").unwrap(), RsopMode::Open);
+        assert_eq!(
+            *BIN_NAME_TO_MODE.get("xdg-open").unwrap(),
+            RsopMode::XdgOpen
+        );
+        assert_eq!(*BIN_NAME_TO_MODE.get("rse").unwrap(), RsopMode::Edit);
+        assert_eq!(*BIN_NAME_TO_MODE.get("rsi").unwrap(), RsopMode::Identify);
+    }
+
+    #[test]
+    fn bin_name_to_mode_count() {
+        assert_eq!(BIN_NAME_TO_MODE.len(), 5);
+    }
+
+    #[test]
+    fn bin_name_to_mode_unknown() {
+        assert!(BIN_NAME_TO_MODE.get("unknown").is_none());
+        assert!(BIN_NAME_TO_MODE.get("rsop").is_none());
+    }
+
+    #[test]
+    fn rsop_mode_variants() {
+        let variants = RsopMode::VARIANTS;
+        assert_eq!(variants.len(), 5);
+        assert!(variants.contains(&"preview"));
+        assert!(variants.contains(&"open"));
+        assert!(variants.contains(&"xdg-open"));
+        assert!(variants.contains(&"edit"));
+        assert!(variants.contains(&"identify"));
+    }
+
+    #[test]
+    fn rsop_mode_clone() {
+        let mode = RsopMode::Preview;
+        let cloned = mode.clone();
+        assert_eq!(mode, cloned);
+    }
+
+    #[test]
+    fn rsop_mode_equality() {
+        assert_eq!(RsopMode::Open, RsopMode::Open);
+        assert_ne!(RsopMode::Open, RsopMode::Edit);
+        assert_ne!(RsopMode::Preview, RsopMode::XdgOpen);
+    }
+}

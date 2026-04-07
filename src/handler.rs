@@ -1016,4 +1016,636 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn split_mime_simple() {
+        assert_eq!(
+            HandlerMapping::split_mime("text/plain"),
+            vec!["text/plain", "text"]
+        );
+    }
+
+    #[test]
+    fn split_mime_no_slash() {
+        assert_eq!(HandlerMapping::split_mime("text"), vec!["text"]);
+    }
+
+    #[test]
+    fn split_mime_plus_and_dots() {
+        assert_eq!(
+            HandlerMapping::split_mime("application/vnd.oasis.opendocument+xml"),
+            vec![
+                "application/vnd.oasis.opendocument+xml",
+                "application/vnd.oasis.opendocument",
+                "application/vnd.oasis",
+                "application/vnd",
+                "application"
+            ]
+        );
+    }
+
+    #[test]
+    fn path_extensions_hidden_file() {
+        assert_eq!(
+            HandlerMapping::path_extensions(Path::new("/tmp/.hidden")).ok(),
+            Some(vec![])
+        );
+    }
+
+    #[test]
+    fn path_extensions_hidden_file_with_ext() {
+        assert_eq!(
+            HandlerMapping::path_extensions(Path::new("/tmp/.hidden.txt")).ok(),
+            Some(vec!["hidden.txt".to_owned(), "txt".to_owned()])
+        );
+    }
+
+    #[test]
+    fn path_extensions_single_dot() {
+        assert_eq!(
+            HandlerMapping::path_extensions(Path::new("/tmp/foo.")).ok(),
+            Some(vec![String::new()])
+        );
+    }
+
+    #[test]
+    fn substitute_path() {
+        let term_size = (80, 24);
+        let path = Path::new("/tmp/test.txt");
+
+        assert_eq!(
+            HandlerMapping::substitute("cat %i", path, None, term_size, None, None).unwrap(),
+            "cat /tmp/test.txt"
+        );
+    }
+
+    #[test]
+    fn substitute_mime() {
+        let term_size = (80, 24);
+        let path = Path::new("/tmp/test.txt");
+
+        assert_eq!(
+            HandlerMapping::substitute(
+                "echo %m",
+                path,
+                Some("text/plain"),
+                term_size,
+                None,
+                None
+            )
+            .unwrap(),
+            "echo text/plain"
+        );
+    }
+
+    #[test]
+    fn substitute_term_size() {
+        let term_size = (120, 40);
+        let path = Path::new("");
+
+        assert_eq!(
+            HandlerMapping::substitute("head -n %l %i", path, None, term_size, None, None)
+                .unwrap(),
+            "head -n 40"
+        );
+        assert_eq!(
+            HandlerMapping::substitute("cols=%c lines=%l", path, None, term_size, None, None)
+                .unwrap(),
+            "cols=120 lines=40"
+        );
+    }
+
+    #[test]
+    fn substitute_double_percent_escape() {
+        let term_size = (80, 24);
+        let path = Path::new("");
+
+        assert_eq!(
+            HandlerMapping::substitute("a %%i b", path, None, term_size, None, None).unwrap(),
+            "a %i b"
+        );
+        assert_eq!(
+            HandlerMapping::substitute("a %%c b", path, None, term_size, None, None).unwrap(),
+            "a %c b"
+        );
+        assert_eq!(
+            HandlerMapping::substitute("a %%l b", path, None, term_size, None, None).unwrap(),
+            "a %l b"
+        );
+        assert_eq!(
+            HandlerMapping::substitute(
+                "a %%m b",
+                path,
+                Some("text/plain"),
+                term_size,
+                None,
+                None
+            )
+            .unwrap(),
+            "a %m b"
+        );
+    }
+
+    #[test]
+    fn substitute_multiple_patterns() {
+        let term_size = (100, 50);
+        let path = Path::new("/tmp/file.txt");
+
+        assert_eq!(
+            HandlerMapping::substitute(
+                "bat -n --terminal-width %c -r :%l %i",
+                path,
+                None,
+                term_size,
+                None,
+                None
+            )
+            .unwrap(),
+            "bat -n --terminal-width 100 -r :50 /tmp/file.txt"
+        );
+    }
+
+    #[test]
+    fn substitute_multiple_same_pattern() {
+        let term_size = (80, 24);
+        let path = Path::new("/tmp/a.txt");
+
+        assert_eq!(
+            HandlerMapping::substitute("echo %i %i", path, None, term_size, None, None).unwrap(),
+            "echo /tmp/a.txt /tmp/a.txt"
+        );
+    }
+
+    #[test]
+    fn substitute_path_with_spaces() {
+        let term_size = (80, 24);
+        let path = Path::new("/tmp/my file.txt");
+
+        let result =
+            HandlerMapping::substitute("cat %i", path, None, term_size, None, None).unwrap();
+        assert_eq!(result, "cat '/tmp/my file.txt'");
+    }
+
+    #[test]
+    fn substitute_tmp_file() {
+        let term_size = (80, 24);
+        let path = Path::new("/tmp/test.txt");
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+
+        let result =
+            HandlerMapping::substitute("cp %i %t", path, None, term_size, Some(&tmp), None)
+                .unwrap();
+        assert!(result.starts_with("cp /tmp/test.txt "));
+        assert!(result.contains(tmp.path().to_str().unwrap()));
+    }
+
+    #[test]
+    fn substitute_tmp_dir() {
+        let term_size = (80, 24);
+        let path = Path::new("/tmp/test.txt");
+        let tmp_dir = tempfile::tempdir().unwrap();
+
+        let result =
+            HandlerMapping::substitute("cp %i %T", path, None, term_size, None, Some(&tmp_dir))
+                .unwrap();
+        assert!(result.starts_with("cp /tmp/test.txt "));
+        assert!(result.contains(tmp_dir.path().to_str().unwrap()));
+    }
+
+    #[test]
+    fn substitute_no_patterns() {
+        let term_size = (80, 24);
+        let path = Path::new("");
+
+        assert_eq!(
+            HandlerMapping::substitute(
+                "plain command here",
+                path,
+                None,
+                term_size,
+                None,
+                None
+            )
+            .unwrap(),
+            "plain command here"
+        );
+    }
+
+    #[test]
+    fn substitute_trims_whitespace() {
+        let term_size = (80, 24);
+        let path = Path::new("");
+
+        assert_eq!(
+            HandlerMapping::substitute("  cmd  ", path, None, term_size, None, None).unwrap(),
+            "cmd"
+        );
+    }
+
+    #[test]
+    fn count_pattern_no_match() {
+        assert_eq!(HandlerMapping::count_pattern("hello world", 'i'), 0);
+        assert_eq!(HandlerMapping::count_pattern("hello world", 'm'), 0);
+        assert_eq!(HandlerMapping::count_pattern("hello world", 'c'), 0);
+        assert_eq!(HandlerMapping::count_pattern("hello world", 'l'), 0);
+    }
+
+    #[test]
+    fn count_pattern_escaped() {
+        assert_eq!(HandlerMapping::count_pattern("a %%i b", 'i'), 0);
+        assert_eq!(HandlerMapping::count_pattern("a %%m b", 'm'), 0);
+    }
+
+    #[test]
+    fn count_pattern_mixed() {
+        assert_eq!(
+            HandlerMapping::count_pattern("a %i b %%i c %i", 'i'),
+            2
+        );
+    }
+
+    #[test]
+    fn has_pattern_filter() {
+        let filter = FileFilter {
+            command: "gzip -dc %i".to_owned(),
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        };
+        let processor = FileProcessor::Filter(filter);
+        assert!(processor.has_pattern('i'));
+        assert!(!processor.has_pattern('m'));
+    }
+
+    #[test]
+    fn build_cmd_no_shell() {
+        let cmd = HandlerMapping::build_cmd("cat /tmp/test.txt", false).unwrap();
+        assert_eq!(cmd, vec!["cat", "/tmp/test.txt"]);
+    }
+
+    #[test]
+    fn build_cmd_shell() {
+        let cmd = HandlerMapping::build_cmd("echo hello | grep h", true).unwrap();
+        assert_eq!(cmd, vec!["sh", "-c", "echo hello | grep h"]);
+    }
+
+    #[test]
+    fn build_cmd_quoted() {
+        let cmd = HandlerMapping::build_cmd("cat '/tmp/my file.txt'", false).unwrap();
+        assert_eq!(cmd, vec!["cat", "/tmp/my file.txt"]);
+    }
+
+    #[test]
+    fn build_cmd_invalid() {
+        let result = HandlerMapping::build_cmd("cat 'unclosed", false);
+        assert!(result.is_err());
+    }
+
+    fn default_handler(command: &str) -> FileHandler {
+        FileHandler {
+            command: command.to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        }
+    }
+
+    fn minimal_config() -> config::Config {
+        config::Config {
+            filetype: HashMap::new(),
+            handler_preview: HashMap::new(),
+            default_handler_preview: default_handler("file %i"),
+            handler_open: HashMap::new(),
+            default_handler_open: default_handler("cat %i"),
+            handler_edit: HashMap::new(),
+            filter: HashMap::new(),
+            handler_scheme: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn handler_mapping_new_minimal() {
+        let config = minimal_config();
+        let mapping = HandlerMapping::new(&config);
+        assert!(mapping.is_ok());
+    }
+
+    #[test]
+    fn handler_mapping_new_with_filetype_and_handler() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "text".to_owned(),
+            config::Filetype {
+                extensions: vec!["txt".to_owned()],
+                mimes: vec!["text/plain".to_owned()],
+            },
+        );
+        config
+            .handler_preview
+            .insert("text".to_owned(), default_handler("head %i"));
+        let mapping = HandlerMapping::new(&config);
+        assert!(mapping.is_ok());
+    }
+
+    #[test]
+    fn handler_mapping_unbound_filetype() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "orphan".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["text/plain".to_owned()],
+            },
+        );
+        let err = HandlerMapping::new(&config).unwrap_err();
+        assert!(err.to_string().contains("orphan"));
+        assert!(err.to_string().contains("not bound"));
+    }
+
+    #[test]
+    fn handler_mapping_no_pipe_and_no_wait() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "text".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["text".to_owned()],
+            },
+        );
+        config.handler_preview.insert(
+            "text".to_owned(),
+            FileHandler {
+                command: "cat %i".to_owned(),
+                wait: false,
+                shell: false,
+                no_pipe: true,
+                stdin_arg: None,
+            },
+        );
+        let err = HandlerMapping::new(&config).unwrap_err();
+        assert!(err.to_string().contains("no_pipe"));
+        assert!(err.to_string().contains("wait"));
+    }
+
+    #[test]
+    fn handler_mapping_multiple_i_no_pipe_false() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "text".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["text".to_owned()],
+            },
+        );
+        config.handler_preview.insert(
+            "text".to_owned(),
+            FileHandler {
+                command: "diff %i %i".to_owned(),
+                wait: true,
+                shell: false,
+                no_pipe: false,
+                stdin_arg: None,
+            },
+        );
+        let err = HandlerMapping::new(&config).unwrap_err();
+        assert!(err.to_string().contains("no_pipe"));
+        assert!(err.to_string().contains("%i"));
+    }
+
+    #[test]
+    fn handler_mapping_multiple_i_no_pipe_true() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "text".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["text".to_owned()],
+            },
+        );
+        config.handler_preview.insert(
+            "text".to_owned(),
+            FileHandler {
+                command: "diff %i %i".to_owned(),
+                wait: true,
+                shell: false,
+                no_pipe: true,
+                stdin_arg: None,
+            },
+        );
+        assert!(HandlerMapping::new(&config).is_ok());
+    }
+
+    #[test]
+    fn handler_mapping_filter_multiple_i_no_pipe_false() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "gz".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["application/gzip".to_owned()],
+            },
+        );
+        config.filter.insert(
+            "gz".to_owned(),
+            FileFilter {
+                command: "zcat %i %i".to_owned(),
+                shell: false,
+                no_pipe: false,
+                stdin_arg: None,
+            },
+        );
+        let err = HandlerMapping::new(&config).unwrap_err();
+        assert!(err.to_string().contains("no_pipe"));
+        assert!(err.to_string().contains("%i"));
+    }
+
+    #[test]
+    fn handler_mapping_filter_multiple_i_no_pipe_true() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "gz".to_owned(),
+            config::Filetype {
+                extensions: vec![],
+                mimes: vec!["application/gzip".to_owned()],
+            },
+        );
+        config.filter.insert(
+            "gz".to_owned(),
+            FileFilter {
+                command: "zcat %i %i".to_owned(),
+                shell: false,
+                no_pipe: true,
+                stdin_arg: None,
+            },
+        );
+        assert!(HandlerMapping::new(&config).is_ok());
+    }
+
+    #[test]
+    fn pipe_forward_empty_header() {
+        let mut src = io::Cursor::new(b"hello world");
+        let mut dst = Vec::new();
+
+        let written = HandlerMapping::pipe_forward(&mut src, &mut dst, &[]).unwrap();
+        assert_eq!(written, 11);
+        assert_eq!(dst, b"hello world");
+    }
+
+    #[test]
+    fn pipe_forward_with_header() {
+        let mut src = io::Cursor::new(b" world");
+        let mut dst = Vec::new();
+
+        let written = HandlerMapping::pipe_forward(&mut src, &mut dst, b"hello").unwrap();
+        assert_eq!(written, 11);
+        assert_eq!(dst, b"hello world");
+    }
+
+    #[test]
+    fn pipe_forward_empty_src() {
+        let mut src = io::Cursor::new(b"");
+        let mut dst = Vec::new();
+
+        let written = HandlerMapping::pipe_forward(&mut src, &mut dst, b"header").unwrap();
+        assert_eq!(written, 6);
+        assert_eq!(dst, b"header");
+    }
+
+    #[test]
+    fn pipe_to_tmpfile_with_data() {
+        let pipe = io::Cursor::new(b"rest of data");
+        let tmp = HandlerMapping::pipe_to_tmpfile(b"header-", pipe).unwrap();
+
+        let content = std::fs::read_to_string(tmp.path()).unwrap();
+        assert_eq!(content, "header-rest of data");
+    }
+
+    #[test]
+    fn pipe_to_tmpfile_empty() {
+        let pipe = io::Cursor::new(b"");
+        let tmp = HandlerMapping::pipe_to_tmpfile(b"", pipe).unwrap();
+
+        let content = std::fs::read_to_string(tmp.path()).unwrap();
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn file_handlers_new() {
+        let default = FileHandler {
+            command: "cat %i".to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        };
+        let handlers = FileHandlers::new(&default);
+        assert!(handlers.extensions.is_empty());
+        assert!(handlers.mimes.is_empty());
+        assert_eq!(handlers.default, default);
+    }
+
+    #[test]
+    fn file_handlers_add() {
+        let default = FileHandler {
+            command: "cat %i".to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        };
+        let mut handlers = FileHandlers::new(&default);
+
+        let processor = Rc::new(FileProcessor::Handler(FileHandler {
+            command: "head %i".to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        }));
+
+        let filetype = config::Filetype {
+            extensions: vec!["txt".to_owned(), "log".to_owned()],
+            mimes: vec!["text/plain".to_owned()],
+        };
+        handlers.add(&processor, &filetype);
+
+        assert!(handlers.extensions.contains_key("txt"));
+        assert!(handlers.extensions.contains_key("log"));
+        assert!(handlers.mimes.contains_key("text/plain"));
+    }
+
+    #[test]
+    fn scheme_handlers_new_and_add() {
+        let mut scheme_handlers = SchemeHandlers::new();
+        assert!(scheme_handlers.schemes.is_empty());
+
+        let handler = SchemeHandler {
+            command: "firefox %i".to_owned(),
+            shell: false,
+        };
+        scheme_handlers.add(&handler, "https");
+        assert!(scheme_handlers.schemes.contains_key("https"));
+        assert_eq!(scheme_handlers.schemes.get("https").unwrap().command, "firefox %i");
+    }
+
+    #[test]
+    fn validate_handler_ok() {
+        let handler = FileHandler {
+            command: "cat %i".to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        };
+        assert!(HandlerMapping::validate_handler(&handler).is_ok());
+    }
+
+    #[test]
+    fn validate_handler_no_pipe_no_wait() {
+        let handler = FileHandler {
+            command: "cat %i".to_owned(),
+            wait: false,
+            shell: false,
+            no_pipe: true,
+            stdin_arg: None,
+        };
+        assert!(HandlerMapping::validate_handler(&handler).is_err());
+    }
+
+    #[test]
+    fn validate_handler_multiple_i_no_pipe_false() {
+        let handler = FileHandler {
+            command: "diff %i %i".to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        };
+        assert!(HandlerMapping::validate_handler(&handler).is_err());
+    }
+
+    #[test]
+    fn validate_handler_multiple_i_no_pipe_true() {
+        let handler = FileHandler {
+            command: "diff %i %i".to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: true,
+            stdin_arg: None,
+        };
+        assert!(HandlerMapping::validate_handler(&handler).is_ok());
+    }
+
+    #[test]
+    fn validate_handler_single_i_no_pipe_false() {
+        let handler = FileHandler {
+            command: "cat %i".to_owned(),
+            wait: true,
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        };
+        assert!(HandlerMapping::validate_handler(&handler).is_ok());
+    }
 }

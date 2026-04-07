@@ -114,6 +114,8 @@ fn parse_config_path(path: &Path) -> anyhow::Result<Config> {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use super::*;
 
     #[test]
@@ -227,5 +229,364 @@ mod tests {
             }
         );
         assert_eq!(config.filter.len(), 5);
+    }
+
+    #[test]
+    fn missing_default_handlers() {
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(b"").unwrap();
+
+        let err = parse_config_path(config_file.path()).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("default_handler_preview"));
+    }
+
+    #[test]
+    fn missing_default_handler_preview() {
+        let toml = r#"
+[default_handler_open]
+command = "cat %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let err = parse_config_path(config_file.path()).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("default_handler_preview"));
+    }
+
+    #[test]
+    fn missing_default_handler_open() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let err = parse_config_path(config_file.path()).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("default_handler_open"));
+    }
+
+    #[test]
+    fn invalid_toml() {
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(b"this is not valid toml [[[").unwrap();
+
+        let err = parse_config_path(config_file.path()).unwrap_err();
+        assert!(err.downcast_ref::<toml::de::Error>().is_some());
+    }
+
+    #[test]
+    fn nonexistent_file() {
+        let err =
+            parse_config_path(Path::new("/tmp/nonexistent_rsop_test_config.toml")).unwrap_err();
+        assert!(err.downcast_ref::<io::Error>().is_some());
+    }
+
+    #[test]
+    fn handler_defaults() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.text]
+mimes = ["text"]
+
+[handler_preview.text]
+command = "head %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let text_handler = config.handler_preview.get("text").unwrap();
+        assert!(text_handler.wait);
+        assert!(!text_handler.shell);
+        assert!(!text_handler.no_pipe);
+        assert!(text_handler.stdin_arg.is_none());
+    }
+
+    #[test]
+    fn handler_all_fields() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.text]
+mimes = ["text"]
+
+[handler_preview.text]
+command = "bat %i"
+wait = false
+shell = true
+no_pipe = true
+stdin_arg = "/dev/stdin"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let text_handler = config.handler_preview.get("text").unwrap();
+        assert_eq!(
+            *text_handler,
+            FileHandler {
+                command: "bat %i".to_owned(),
+                wait: false,
+                shell: true,
+                no_pipe: true,
+                stdin_arg: Some("/dev/stdin".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn extension_normalization() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.text]
+extensions = ["TXT", "Md", "RST"]
+mimes = ["text"]
+
+[handler_preview.text]
+command = "head %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let text_ft = config.filetype.get("text").unwrap();
+        assert_eq!(text_ft.extensions, vec!["txt", "md", "rst"]);
+    }
+
+    #[test]
+    fn filetype_extensions_only() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.text]
+extensions = ["txt"]
+
+[handler_preview.text]
+command = "head %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let text_ft = config.filetype.get("text").unwrap();
+        assert_eq!(text_ft.extensions, vec!["txt"]);
+        assert!(text_ft.mimes.is_empty());
+    }
+
+    #[test]
+    fn filetype_mimes_only() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.text]
+mimes = ["text/plain"]
+
+[handler_preview.text]
+command = "head %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let text_ft = config.filetype.get("text").unwrap();
+        assert!(text_ft.extensions.is_empty());
+        assert_eq!(text_ft.mimes, vec!["text/plain"]);
+    }
+
+    #[test]
+    fn filter_config() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.gzip]
+mimes = ["application/gzip"]
+
+[filter.gzip]
+command = "gzip -dc %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let filter = config.filter.get("gzip").unwrap();
+        assert_eq!(filter.command, "gzip -dc %i");
+        assert!(!filter.shell);
+        assert!(!filter.no_pipe);
+        assert!(filter.stdin_arg.is_none());
+    }
+
+    #[test]
+    fn filter_all_fields() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.gzip]
+mimes = ["application/gzip"]
+
+[filter.gzip]
+command = "pigz -dc %i"
+shell = true
+no_pipe = true
+stdin_arg = ""
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let filter = config.filter.get("gzip").unwrap();
+        assert_eq!(filter.command, "pigz -dc %i");
+        assert!(filter.shell);
+        assert!(filter.no_pipe);
+        assert_eq!(filter.stdin_arg, Some(String::new()));
+    }
+
+    #[test]
+    fn scheme_handler_config() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[handler_scheme.http]
+command = "firefox %i"
+
+[handler_scheme.https]
+command = "firefox %i"
+shell = true
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        assert_eq!(config.handler_scheme.len(), 2);
+        let http = config.handler_scheme.get("http").unwrap();
+        assert_eq!(http.command, "firefox %i");
+        assert!(!http.shell);
+        let https = config.handler_scheme.get("https").unwrap();
+        assert!(https.shell);
+    }
+
+    #[test]
+    fn handler_edit_config() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.text]
+mimes = ["text"]
+
+[handler_edit.text]
+command = "vim %i"
+no_pipe = true
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        let edit = config.handler_edit.get("text").unwrap();
+        assert_eq!(edit.command, "vim %i");
+        assert!(edit.no_pipe);
+    }
+
+    #[test]
+    fn empty_filetypes_and_handlers() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        assert!(config.filetype.is_empty());
+        assert!(config.handler_preview.is_empty());
+        assert!(config.handler_open.is_empty());
+        assert!(config.handler_edit.is_empty());
+        assert!(config.filter.is_empty());
+        assert!(config.handler_scheme.is_empty());
+    }
+
+    #[test]
+    fn multiple_filetypes() {
+        let toml = r#"
+[default_handler_preview]
+command = "file %i"
+
+[default_handler_open]
+command = "cat %i"
+
+[filetype.text]
+mimes = ["text"]
+extensions = ["txt"]
+
+[filetype.image]
+mimes = ["image"]
+extensions = ["png", "jpg"]
+
+[filetype.audio]
+mimes = ["audio"]
+
+[handler_preview.text]
+command = "head %i"
+
+[handler_preview.image]
+command = "chafa %i"
+
+[handler_open.audio]
+command = "mpv %i"
+wait = false
+"#;
+        let mut config_file = tempfile::NamedTempFile::new().unwrap();
+        config_file.write_all(toml.as_bytes()).unwrap();
+
+        let config = parse_config_path(config_file.path()).unwrap();
+        assert_eq!(config.filetype.len(), 3);
+        assert_eq!(config.handler_preview.len(), 2);
+        assert_eq!(config.handler_open.len(), 1);
+
+        let audio_handler = config.handler_open.get("audio").unwrap();
+        assert!(!audio_handler.wait);
     }
 }
