@@ -23,13 +23,13 @@ strum = { version = "0.28.0", default-features = false, features = ["derive", "s
 tempfile = { version = "3.27.0", default-features = false }
 termion = { version = "4.0.6", default-features = false }
 thiserror = { version = "2.0.18", default-features = false }
-toml = { version = "1.1.0", default-features = false, features = ["parse", "serde"] }
+toml = { version = "1.1.2", default-features = false, features = ["parse", "serde"] }
 tree_magic_mini = { version = "3.2.2", default-features = false }
 url = { version = "2.5.8", default-features = false }
 xdg = { version = "3.0.0", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-nix = { version = "0.30", default-features = false, features = ["fs"] }
+nix = { version = "0.31", default-features = false, features = ["fs"] }
 
 [lints.rust]
 # https://doc.rust-lang.org/rustc/lints/listing/allowed-by-default.html
