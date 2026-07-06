@@ -97,6 +97,8 @@ pub(crate) struct HandlerMapping {
     open: FileHandlers,
     edit: FileHandlers,
     scheme: SchemeHandlers,
+    /// Detected MIME type to representative file extension, to name temporary files fed from a pipe
+    mime_ext: HashMap<String, String>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -161,11 +163,19 @@ impl HandlerMapping {
             handlers_scheme.add(handler, schemes);
         }
 
+        let mime_ext = cfg
+            .filetype
+            .values()
+            .filter_map(|filetype| Some((filetype.extensions.first()?, &filetype.mimes)))
+            .flat_map(|(ext, mimes)| mimes.iter().map(move |mime| (mime.clone(), ext.clone())))
+            .collect();
+
         Ok(HandlerMapping {
             preview: handlers_preview,
             open: handlers_open,
             edit: handlers_edit,
             scheme: handlers_scheme,
+            mime_ext,
         })
     }
 
@@ -597,15 +607,16 @@ impl HandlerMapping {
         T: Read + Send,
     {
         let term_size = Self::term_size();
+        let ext = mime.and_then(|m| self.mime_ext.get(m)).map(String::as_str);
 
         match processor {
             FileProcessor::Handler(handler) => {
-                Self::run_pipe_handler(handler, header, pipe, mime, term_size)
+                Self::run_pipe_handler(handler, header, pipe, mime, term_size, ext)
             }
             FileProcessor::Filter(filter) => crossbeam_utils::thread::scope(|scope| {
                 // Write to a temporary file if filter does not support reading from stdin
                 let input = if filter.no_pipe {
-                    PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+                    PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe, ext)?)
                 } else {
                     PipeOrTmpFile::Pipe(pipe)
                 };
@@ -701,6 +712,7 @@ impl HandlerMapping {
         pipe: T,
         mime: Option<&str>,
         term_size: (u16, u16),
+        ext: Option<&str>,
     ) -> Result<(), HandlerError>
     where
         T: Read,
@@ -710,14 +722,14 @@ impl HandlerMapping {
             #[cfg(target_os = "linux")]
             {
                 if handler.wait {
-                    PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+                    PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe, ext)?)
                 } else {
                     PipeOrTmpFile::MemFd(Self::pipe_to_memfd(header, pipe)?)
                 }
             }
             #[cfg(not(target_os = "linux"))]
             {
-                PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe)?)
+                PipeOrTmpFile::TmpFile(Self::pipe_to_tmpfile(header, pipe, ext)?)
             }
         } else {
             PipeOrTmpFile::Pipe(pipe)
@@ -879,12 +891,18 @@ impl HandlerMapping {
         Ok(file)
     }
 
-    fn pipe_to_tmpfile<T>(header: &[u8], mut pipe: T) -> anyhow::Result<tempfile::NamedTempFile>
+    fn pipe_to_tmpfile<T>(
+        header: &[u8],
+        mut pipe: T,
+        ext: Option<&str>,
+    ) -> anyhow::Result<tempfile::NamedTempFile>
     where
         T: Read,
     {
+        let suffix = ext.map(|ext| format!(".{ext}")).unwrap_or_default();
         let mut tmp_file = tempfile::Builder::new()
             .prefix(const_format::concatcp!(env!("CARGO_PKG_NAME"), '_'))
+            .suffix(&suffix)
             .tempfile()?;
         log::debug!("Writing to temporary file {:?}", tmp_file.path());
         let file = tmp_file.as_file_mut();
@@ -1372,6 +1390,23 @@ mod tests {
     }
 
     #[test]
+    fn handler_mapping_mime_ext() {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "html".to_owned(),
+            config::Filetype {
+                extensions: vec!["htm".to_owned(), "html".to_owned()],
+                mimes: vec!["text/html".to_owned()],
+            },
+        );
+        config
+            .handler_open
+            .insert("html".to_owned(), default_handler("firefox %i"));
+        let mapping = HandlerMapping::new(&config).unwrap();
+        assert_eq!(mapping.mime_ext.get("text/html"), Some(&"htm".to_owned()));
+    }
+
+    #[test]
     fn handler_mapping_unbound_filetype() {
         let mut config = minimal_config();
         config.filetype.insert(
@@ -1588,7 +1623,7 @@ mod tests {
     #[test]
     fn pipe_to_tmpfile_with_data() {
         let pipe = io::Cursor::new(b"rest of data");
-        let tmp = HandlerMapping::pipe_to_tmpfile(b"header-", pipe).unwrap();
+        let tmp = HandlerMapping::pipe_to_tmpfile(b"header-", pipe, None).unwrap();
 
         let content = std::fs::read_to_string(tmp.path()).unwrap();
         assert_eq!(content, "header-rest of data");
@@ -1597,10 +1632,18 @@ mod tests {
     #[test]
     fn pipe_to_tmpfile_empty() {
         let pipe = io::Cursor::new(b"");
-        let tmp = HandlerMapping::pipe_to_tmpfile(b"", pipe).unwrap();
+        let tmp = HandlerMapping::pipe_to_tmpfile(b"", pipe, None).unwrap();
 
         let content = std::fs::read_to_string(tmp.path()).unwrap();
         assert_eq!(content, "");
+    }
+
+    #[test]
+    fn pipe_to_tmpfile_with_extension() {
+        let pipe = io::Cursor::new(b"data");
+        let tmp = HandlerMapping::pipe_to_tmpfile(b"", pipe, Some("html")).unwrap();
+
+        assert_eq!(tmp.path().extension().unwrap(), "html");
     }
 
     #[test]
