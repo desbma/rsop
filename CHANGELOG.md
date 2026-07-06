@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.6.1 - 2026-07-06
+
+### <!-- 02 -->🐛 Bug fixes
+
+- Extensionless pipe substitution ([4e2e4df](https://github.com/desbma/rsop/commit/4e2e4dffd6bae71ada28602f6dad9d14431cfe8e) by desbma)
+
+### <!-- 09 -->🤖 Continuous integration
+
+- Pin gh actions versions with hash ([42533e8](https://github.com/desbma/rsop/commit/42533e80db62a3cc3fd6be7f47d0b5f09711c175) by desbma)
+- Update actions ([d6f2878](https://github.com/desbma/rsop/commit/d6f28785b53563ce3f52257c1e720b71c97d3429) by desbma)
+
+### <!-- 10 -->🧰 Miscellaneous tasks
+
+- Update AGENTS.md ([286371f](https://github.com/desbma/rsop/commit/286371f2714d6bcf1fbc6bdcf900856253a3b7ac) by desbma)
+- Update dependencies ([89f9d36](https://github.com/desbma/rsop/commit/89f9d369f80124d51b012b3927ed8e4d88c6bb48) by desbma)
+- Update lints ([778d1d6](https://github.com/desbma/rsop/commit/778d1d6f39aca91438304abd7eca62c9c88194f9) by desbma)
+- Update release script ([048d1e6](https://github.com/desbma/rsop/commit/048d1e651f1094162f75db8baa49b3158c62abbf) by desbma)
+
+______________________________________________________________________
+
 ## 1.6.0 - 2026-04-07
 
 ### <!-- 01 -->💡 Features
