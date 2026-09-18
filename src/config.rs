@@ -31,6 +31,7 @@ const fn default_file_handler_wait() -> bool {
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 pub(crate) struct FileFilter {
     pub command: String,
     #[serde(default)]

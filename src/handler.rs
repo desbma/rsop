@@ -21,6 +21,7 @@ use crate::{
 };
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 enum FileProcessor {
     Filter(FileFilter),
     Handler(FileHandler),
@@ -127,6 +128,7 @@ impl HandlerMapping {
             let handler_edit = cfg.handler_edit.get(name).cloned();
             let handler_preview = cfg.handler_preview.get(name).cloned();
             let filter = cfg.filter.get(name).cloned();
+            let (has_open, has_preview) = (handler_open.is_some(), handler_preview.is_some());
             anyhow::ensure!(
                 handler_open.is_some()
                     || handler_edit.is_some()
@@ -151,10 +153,15 @@ impl HandlerMapping {
                     filter.no_pipe || (Self::count_pattern(&filter.command, 'i') <= 1),
                     "Filter {filter:?} can not have both 'no_pipe = false' and multiple %i in command"
                 );
+                // A filter fills preview and open only if they have no explicit handler
                 let proc_filter = Rc::new(FileProcessor::Filter(filter));
-                handlers_open.add(&Rc::clone(&proc_filter), filetype);
+                if !has_open {
+                    handlers_open.add(&Rc::clone(&proc_filter), filetype);
+                }
                 // handlers_edit.add(&Rc::clone(&proc_filter), filetype);
-                handlers_preview.add(&Rc::clone(&proc_filter), filetype);
+                if !has_preview {
+                    handlers_preview.add(&Rc::clone(&proc_filter), filetype);
+                }
             }
         }
 
@@ -1588,6 +1595,78 @@ mod tests {
             },
         );
         assert!(HandlerMapping::new(&config).is_ok());
+    }
+
+    fn markdown_filter() -> FileFilter {
+        FileFilter {
+            command: "md2html %i".to_owned(),
+            shell: false,
+            no_pipe: false,
+            stdin_arg: None,
+        }
+    }
+
+    fn markdown_config() -> config::Config {
+        let mut config = minimal_config();
+        config.filetype.insert(
+            "markdown".to_owned(),
+            config::Filetype {
+                extensions: vec!["md".to_owned()],
+                mimes: vec![],
+            },
+        );
+        config
+            .filter
+            .insert("markdown".to_owned(), markdown_filter());
+        config
+    }
+
+    #[test]
+    fn handler_mapping_filter_fills_modes_without_handler() {
+        let config = markdown_config();
+        let mapping = HandlerMapping::new(&config).unwrap();
+        assert_eq!(
+            **mapping.preview.extensions.get("md").unwrap(),
+            FileProcessor::Filter(markdown_filter())
+        );
+        assert_eq!(
+            **mapping.open.extensions.get("md").unwrap(),
+            FileProcessor::Filter(markdown_filter())
+        );
+    }
+
+    #[test]
+    fn handler_mapping_filter_does_not_shadow_preview_handler() {
+        let mut config = markdown_config();
+        config
+            .handler_preview
+            .insert("markdown".to_owned(), default_handler("mdcat %i"));
+        let mapping = HandlerMapping::new(&config).unwrap();
+        assert_eq!(
+            **mapping.preview.extensions.get("md").unwrap(),
+            FileProcessor::Handler(default_handler("mdcat %i"))
+        );
+        assert_eq!(
+            **mapping.open.extensions.get("md").unwrap(),
+            FileProcessor::Filter(markdown_filter())
+        );
+    }
+
+    #[test]
+    fn handler_mapping_filter_does_not_shadow_open_handler() {
+        let mut config = markdown_config();
+        config
+            .handler_open
+            .insert("markdown".to_owned(), default_handler("glow %i"));
+        let mapping = HandlerMapping::new(&config).unwrap();
+        assert_eq!(
+            **mapping.open.extensions.get("md").unwrap(),
+            FileProcessor::Handler(default_handler("glow %i"))
+        );
+        assert_eq!(
+            **mapping.preview.extensions.get("md").unwrap(),
+            FileProcessor::Filter(markdown_filter())
+        );
     }
 
     #[test]
