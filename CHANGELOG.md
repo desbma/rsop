@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.7.0 - 2026-09-18
+
+### <!-- 01 -->💡 Features
+
+- Lower filter priority ([5f5b178](https://github.com/desbma/rsop/commit/5f5b178d3394f59d401c4e8e6656a82efc52cb51) by desbma)
+
+### <!-- 09 -->🤖 Continuous integration
+
+- Update actions ([60e3698](https://github.com/desbma/rsop/commit/60e3698cacc7e99fb28a2af11dc804572fb0f5cb) by desbma)
+
+### <!-- 10 -->🧰 Miscellaneous tasks
+
+- Update dependencies ([5a71214](https://github.com/desbma/rsop/commit/5a712140b2f3a6573b1af9715508556e8c12f8f3) by desbma)
+- Update lints ([0910d61](https://github.com/desbma/rsop/commit/0910d61af0edcbeb567bf0789a9919814ab81f45) by desbma)
+
+______________________________________________________________________
+
 ## 1.6.1 - 2026-07-06
 
 ### <!-- 02 -->🐛 Bug fixes
