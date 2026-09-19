@@ -20,6 +20,7 @@ cargo update
 
 cargo check
 cargo test
+cargo msrv verify
 
 jj new
 
